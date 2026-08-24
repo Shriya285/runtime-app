@@ -15,8 +15,8 @@ const MOOD_TO_SENTIMENT = {
  * Computes the `sentiment` prop for <SassyBot>, blending three priority tiers
  * (tier 1 highest):
  *
- *  1. Active code-run reactions. `pistonLoading` (continuous) drives 'thinking'
- *     for as long as a Piston request is in flight. `reportRunResult(kind)`
+ *  1. Active code-run reactions. `isExecuting` (continuous) drives 'thinking'
+ *     for as long as a code-execution request is in flight. `reportRunResult(kind)`
  *     and `reportSolutionRevealedEarly()` are edge-triggered: call them once
  *     when a run finishes / a solution is revealed early, and the returned
  *     reaction holds for ~3-4s before falling through to tier 2. A new call
@@ -31,9 +31,9 @@ const MOOD_TO_SENTIMENT = {
  *     sentiment to 'sassy' until the next tier-2 change.
  *
  * @param {{ mood: string } | null} moodState - value from useMoodState()
- * @param {{ pistonLoading?: boolean }} [options]
+ * @param {{ isExecuting?: boolean }} [options]
  */
-export function useSassyBotSentiment(moodState, { pistonLoading = false } = {}) {
+export function useSassyBotSentiment(moodState, { isExecuting = false } = {}) {
   const [runReaction, setRunReaction] = useState(null); // 'cheer' | 'annoyed' | 'angry' | null
   const [bored, setBored] = useState(false);
   const reactionTimer = useRef(null);
@@ -58,11 +58,11 @@ export function useSassyBotSentiment(moodState, { pistonLoading = false } = {}) 
   useEffect(() => () => reactionTimer.current && clearTimeout(reactionTimer.current), []);
 
   const handleAutoSassy = useCallback(() => {
-    if (tier2Sentiment === "idle" && !pistonLoading && !runReaction) setBored(true);
-  }, [tier2Sentiment, pistonLoading, runReaction]);
+    if (tier2Sentiment === "idle" && !isExecuting && !runReaction) setBored(true);
+  }, [tier2Sentiment, isExecuting, runReaction]);
 
   let sentiment;
-  if (pistonLoading) sentiment = "thinking";
+  if (isExecuting) sentiment = "thinking";
   else if (runReaction) sentiment = runReaction;
   else if (tier2Sentiment === "idle" && bored) sentiment = "sassy";
   else sentiment = tier2Sentiment;

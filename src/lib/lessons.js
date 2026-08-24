@@ -29,7 +29,9 @@ function twoSum(nums, target) {
 `,
   testCases: [
     { args: [[2, 7, 11, 15], 9], expected: [0, 1], describe: "[2,7,11,15], target 9" },
-    { args: [[3, 2, 4], 6], expected: [1, 2], describe: "[3,2,4], target 6" },
+    // Two pointers requires sorted input — [2,3,4] not [3,2,4] (the
+    // unsorted classic LeetCode example), so 2+4=6 lands at indices [0,2].
+    { args: [[2, 3, 4], 6], expected: [0, 2], describe: "[2,3,4], target 6" },
     { args: [[3, 3], 6], expected: [0, 1], describe: "[3,3], target 6" },
   ],
 };

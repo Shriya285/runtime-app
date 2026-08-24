@@ -43,7 +43,7 @@ export default function OutputPanel({ state, error, results, runtimeMs, memoryBy
             animation: "spin 0.7s linear infinite",
           }}
         />
-        running against Piston&hellip;
+        running your code&hellip;
       </div>
     );
   }

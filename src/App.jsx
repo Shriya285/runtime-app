@@ -5,8 +5,8 @@ import SassyToast from "./components/SassyToast";
 import EmailDigestOptIn from "./components/EmailDigestOptIn";
 import { useMoodState } from "./lib/useMoodState";
 import { useSassyBotSentiment } from "./lib/useSassyBotSentiment";
-import { usePistonExecution } from "./lib/usePistonExecution";
-import { PistonExecutionContext } from "./lib/PistonExecutionContext";
+import { useCodeExecution } from "./lib/useCodeExecution";
+import { CodeExecutionContext } from "./lib/CodeExecutionContext";
 import { CURRENT_LESSON } from "./lib/lessons";
 import {
   requestNotificationPermission,
@@ -17,10 +17,10 @@ import { PUSH_NOTIFICATIONS } from "./lib/sassyLines";
 
 export default function App() {
   const moodState = useMoodState(); // { mood, gapHours, streak, justReturned } or null on first tick
-  const piston = usePistonExecution(CURRENT_LESSON);
+  const execution = useCodeExecution(CURRENT_LESSON);
   const { sentiment, reportRunResult, reportSolutionRevealedEarly, handleAutoSassy } = useSassyBotSentiment(
     moodState,
-    { pistonLoading: piston.isLoading }
+    { isExecuting: execution.isLoading }
   );
   const [toast, setToast] = useState(null);
   const [permission, setPermission] = useState(
@@ -44,15 +44,15 @@ export default function App() {
   }, [moodState]);
 
   // Edge-trigger the run-result reaction the moment a run finishes, rather
-  // than reacting continuously to piston.isLoading — see useSassyBotSentiment.
+  // than reacting continuously to execution.isLoading — see useSassyBotSentiment.
   useEffect(() => {
-    if (!piston.lastRunSummary) return;
-    const { passed, total } = piston.lastRunSummary;
+    if (!execution.lastRunSummary) return;
+    const { passed, total } = execution.lastRunSummary;
     if (total === 0) return;
     if (passed === total) reportRunResult("cheer");
     else if (passed === 0) reportRunResult("angry");
     else reportRunResult("annoyed");
-  }, [piston.lastRunSummary, reportRunResult]);
+  }, [execution.lastRunSummary, reportRunResult]);
 
   const handleEnableReminders = async () => {
     const result = await requestNotificationPermission();
@@ -132,9 +132,9 @@ export default function App() {
         <EmailDigestOptIn />
       </div>
 
-      <PistonExecutionContext.Provider value={piston}>
+      <CodeExecutionContext.Provider value={execution}>
         <Dashboard onSolutionRevealedEarly={reportSolutionRevealedEarly} />
-      </PistonExecutionContext.Provider>
+      </CodeExecutionContext.Provider>
     </div>
   );
 }

@@ -1,16 +1,40 @@
 import { useCallback, useRef, useState } from "react";
-import { executeCode } from "./piston";
+import { executeCode } from "./codeExecutor";
 
 const RESULT_MARKER = "__RUNTIME_RESULTS__";
 
 // Wraps the user's function with a driver that runs every test case inside
-// the sandbox and prints one JSON line we can parse back out — one Piston
-// call per "Run tests" click instead of one per test case.
+// the sandbox and prints one JSON line we can parse back out — one Judge0
+// call per "Run tests" click instead of one per test case. Test-case data
+// is passed through as a JSON string (parsed with JSON.parse/json.loads at
+// runtime) rather than interpolated as source-language literals, so it
+// works the same regardless of target language.
 function buildDriverSource(lesson, userCode) {
+  const testsJson = JSON.stringify(lesson.testCases);
+
+  if (lesson.language === "python") {
+    return [
+      userCode,
+      "",
+      "import json",
+      `__TESTS__ = json.loads(r'''${testsJson}''')`,
+      "__results__ = []",
+      "for __t in __TESTS__:",
+      "    try:",
+      `        __actual = ${lesson.entryPoint}(*__t["args"])`,
+      '        __results__.append({"passed": __actual == __t["expected"], "actual": __actual, "expected": __t["expected"], "args": __t["args"], "error": None})',
+      "    except Exception as __e:",
+      '        __results__.append({"passed": False, "actual": None, "expected": __t["expected"], "args": __t["args"], "error": str(__e)})',
+      `print(${JSON.stringify(RESULT_MARKER)} + json.dumps(__results__))`,
+      "",
+    ].join("\n");
+  }
+
+  // Default: JavaScript.
   return [
     userCode,
     "",
-    `const __TESTS__ = ${JSON.stringify(lesson.testCases)};`,
+    `const __TESTS__ = JSON.parse(${JSON.stringify(testsJson)});`,
     "const __results__ = __TESTS__.map((t) => {",
     "  try {",
     `    const actual = ${lesson.entryPoint}(...t.args);`,
@@ -25,12 +49,12 @@ function buildDriverSource(lesson, userCode) {
 }
 
 /**
- * Owns real Piston execution state for a lesson: loading, per-test results,
+ * Owns real code-execution state for a lesson: loading, per-test results,
  * and a `lastRunSummary` that flips to a fresh object each time a run
  * completes (pass/fail/total) — the signal App.jsx watches to drive
  * useSassyBotSentiment's thinking/cheer/annoyed/angry reactions.
  */
-export function usePistonExecution(lesson) {
+export function useCodeExecution(lesson) {
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState(null);
   const [lastRunSummary, setLastRunSummary] = useState(null);

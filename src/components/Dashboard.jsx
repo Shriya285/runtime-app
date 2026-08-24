@@ -7,7 +7,7 @@ import StruggleTimer from "./StruggleTimer";
 import CompletionPrompt from "./CompletionPrompt";
 import DueForReview from "./DueForReview";
 import { CURRENT_LESSON, LESSONS } from "../lib/lessons";
-import { usePistonExecutionContext } from "../lib/PistonExecutionContext";
+import { useCodeExecutionContext } from "../lib/CodeExecutionContext";
 import { recordCompletion } from "../lib/spacedRepetition";
 
 const COLORS = {
@@ -68,7 +68,7 @@ function codeStorageKey(lessonId) {
 
 export default function Dashboard({ onSolutionRevealedEarly }) {
   const lesson = CURRENT_LESSON;
-  const piston = usePistonExecutionContext();
+  const execution = useCodeExecutionContext();
   const typedTitle = useTypedText(lesson.title, 55, 300);
 
   const [code, setCode] = useState(
@@ -85,16 +85,16 @@ export default function Dashboard({ onSolutionRevealedEarly }) {
 
   // Offer the trigger/core-idea prompt whenever a run comes back all-passed.
   useEffect(() => {
-    if (!piston.lastRunSummary) return;
-    const { passed, total } = piston.lastRunSummary;
+    if (!execution.lastRunSummary) return;
+    const { passed, total } = execution.lastRunSummary;
     if (total > 0 && passed === total) {
       setCompletion({ reason: "tests-passed" });
       setPromptDismissed(false);
     }
-  }, [piston.lastRunSummary]);
+  }, [execution.lastRunSummary]);
 
   const handleRun = () => {
-    piston.runTests(code);
+    execution.runTests(code);
   };
 
   const handleReveal = (wasEarly) => {
@@ -111,14 +111,14 @@ export default function Dashboard({ onSolutionRevealedEarly }) {
     setReviewRefreshKey((k) => k + 1);
   };
 
-  const outputState = piston.isLoading
+  const outputState = execution.isLoading
     ? "loading"
-    : piston.error
+    : execution.error
     ? "error"
-    : piston.results
+    : execution.results
     ? "results"
     : "idle";
-  const allPassed = piston.results && piston.results.every((r) => r.passed);
+  const allPassed = execution.results && execution.results.every((r) => r.passed);
 
   return (
     <div
@@ -402,7 +402,7 @@ export default function Dashboard({ onSolutionRevealedEarly }) {
               <button
                 className="run-btn"
                 onClick={handleRun}
-                disabled={piston.isLoading}
+                disabled={execution.isLoading}
                 style={{
                   background: COLORS.green,
                   color: COLORS.bgDark,
@@ -412,8 +412,8 @@ export default function Dashboard({ onSolutionRevealedEarly }) {
                   fontFamily: FONTS.mono,
                   fontWeight: 600,
                   fontSize: "13px",
-                  cursor: piston.isLoading ? "default" : "pointer",
-                  opacity: piston.isLoading ? 0.7 : 1,
+                  cursor: execution.isLoading ? "default" : "pointer",
+                  opacity: execution.isLoading ? 0.7 : 1,
                   transition: "all 0.15s ease",
                   display: "flex",
                   alignItems: "center",
@@ -451,10 +451,10 @@ export default function Dashboard({ onSolutionRevealedEarly }) {
             >
               <OutputPanel
                 state={outputState}
-                error={piston.error}
-                results={piston.results}
-                runtimeMs={piston.runtimeMs}
-                memoryBytes={piston.memoryBytes}
+                error={execution.error}
+                results={execution.results}
+                runtimeMs={execution.runtimeMs}
+                memoryBytes={execution.memoryBytes}
                 testCount={lesson.testCases.length}
               />
             </div>
