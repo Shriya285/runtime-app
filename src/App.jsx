@@ -4,6 +4,9 @@ import SassyBotMount from "./components/SassyBotMount";
 import SassyToast from "./components/SassyToast";
 import { useMoodState } from "./lib/useMoodState";
 import { useSassyBotSentiment } from "./lib/useSassyBotSentiment";
+import { usePistonExecution } from "./lib/usePistonExecution";
+import { PistonExecutionContext } from "./lib/PistonExecutionContext";
+import { CURRENT_LESSON } from "./lib/lessons";
 import {
   requestNotificationPermission,
   registerServiceWorker,
@@ -13,7 +16,11 @@ import { PUSH_NOTIFICATIONS } from "./lib/sassyLines";
 
 export default function App() {
   const moodState = useMoodState(); // { mood, gapHours, streak, justReturned } or null on first tick
-  const { sentiment, handleAutoSassy } = useSassyBotSentiment(moodState);
+  const piston = usePistonExecution(CURRENT_LESSON);
+  const { sentiment, reportRunResult, reportSolutionRevealedEarly, handleAutoSassy } = useSassyBotSentiment(
+    moodState,
+    { pistonLoading: piston.isLoading }
+  );
   const [toast, setToast] = useState(null);
   const [permission, setPermission] = useState(
     typeof Notification !== "undefined" ? Notification.permission : "unsupported"
@@ -34,6 +41,17 @@ export default function App() {
       setToast({ ...copy, mood: moodState.mood });
     }
   }, [moodState]);
+
+  // Edge-trigger the run-result reaction the moment a run finishes, rather
+  // than reacting continuously to piston.isLoading — see useSassyBotSentiment.
+  useEffect(() => {
+    if (!piston.lastRunSummary) return;
+    const { passed, total } = piston.lastRunSummary;
+    if (total === 0) return;
+    if (passed === total) reportRunResult("cheer");
+    else if (passed === 0) reportRunResult("angry");
+    else reportRunResult("annoyed");
+  }, [piston.lastRunSummary, reportRunResult]);
 
   const handleEnableReminders = async () => {
     const result = await requestNotificationPermission();
@@ -102,7 +120,9 @@ export default function App() {
         </div>
       )}
 
-      <Dashboard />
+      <PistonExecutionContext.Provider value={piston}>
+        <Dashboard onSolutionRevealedEarly={reportSolutionRevealedEarly} />
+      </PistonExecutionContext.Provider>
     </div>
   );
 }

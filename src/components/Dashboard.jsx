@@ -1,4 +1,8 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useEffect, useState } from "react";
+import CodeEditor from "./CodeEditor";
+import OutputPanel from "./OutputPanel";
+import { CURRENT_LESSON } from "../lib/lessons";
+import { usePistonExecutionContext } from "../lib/PistonExecutionContext";
 
 const COLORS = {
   bg: "#1A1B26",
@@ -23,39 +27,6 @@ const FONTS = {
   body: "'Plus Jakarta Sans', sans-serif",
   mono: "'JetBrains Mono', monospace",
 };
-
-const codeLines = [
-  { n: 1, tokens: [["comment", "// two pointers, sorted array"]] },
-  { n: 2, tokens: [["kw", "function"], ["plain", " "], ["fn", "twoSum"], ["plain", "("], ["param", "nums"], ["plain", ", "], ["param", "target"], ["plain", ") {"]] },
-  { n: 3, tokens: [["plain", "  "], ["kw", "let"], ["plain", " left = "], ["num", "0"], ["plain", ", right = nums."], ["fn", "length"], ["plain", " - "], ["num", "1"], ["plain", ";"]] },
-  { n: 4, tokens: [["plain", "  "], ["kw", "while"], ["plain", " (left < right) {"]] },
-  { n: 5, tokens: [["plain", "    "], ["kw", "const"], ["plain", " sum = nums[left] + nums[right];"]] },
-  { n: 6, tokens: [["plain", "    "], ["kw", "if"], ["plain", " (sum === target) "], ["kw", "return"], ["plain", " [left, right];"]] },
-  { n: 7, tokens: [["plain", "    sum < target ? left"], ["op", "++"], ["plain", " : right"], ["op", "--"], ["plain", ";"]] },
-  { n: 8, tokens: [["plain", "  }"]] },
-  { n: 9, tokens: [["plain", "}"]] },
-];
-
-function SyntaxLine({ tokens }) {
-  const tokenColor = {
-    comment: COLORS.comment,
-    kw: COLORS.violet,
-    fn: COLORS.blue,
-    param: COLORS.orange,
-    num: COLORS.yellow,
-    op: COLORS.cyan,
-    plain: COLORS.fg,
-  };
-  return (
-    <>
-      {tokens.map((t, i) => (
-        <span key={i} style={{ color: tokenColor[t[0]] }}>
-          {t[1]}
-        </span>
-      ))}
-    </>
-  );
-}
 
 function useTypedText(text, speed = 28, startDelay = 0) {
   const [out, setOut] = useState("");
@@ -85,15 +56,35 @@ const skillPath = [
   { name: "Trees & Recursion", state: "locked" },
 ];
 
+function codeStorageKey(lessonId) {
+  return `runtime_code_${lessonId}`;
+}
+
 export default function Dashboard() {
-  const [runState, setRunState] = useState("idle"); // idle | compiling | success
-  const typedTitle = useTypedText("Two Pointers", 55, 300);
+  const lesson = CURRENT_LESSON;
+  const piston = usePistonExecutionContext();
+  const typedTitle = useTypedText(lesson.title, 55, 300);
+
+  const [code, setCode] = useState(
+    () => localStorage.getItem(codeStorageKey(lesson.id)) || lesson.starterCode
+  );
+
+  useEffect(() => {
+    localStorage.setItem(codeStorageKey(lesson.id), code);
+  }, [code, lesson.id]);
 
   const handleRun = () => {
-    if (runState === "compiling") return;
-    setRunState("compiling");
-    setTimeout(() => setRunState("success"), 1200);
+    piston.runTests(code);
   };
+
+  const outputState = piston.isLoading
+    ? "loading"
+    : piston.error
+    ? "error"
+    : piston.results
+    ? "results"
+    : "idle";
+  const allPassed = piston.results && piston.results.every((r) => r.passed);
 
   return (
     <div
@@ -233,10 +224,7 @@ export default function Dashboard() {
         }}
       >
         {/* Left: skill path */}
-        <div
-          className="reveal"
-          style={{ width: "260px", flexShrink: 0, animationDelay: "0.08s" }}
-        >
+        <div className="reveal" style={{ width: "260px", flexShrink: 0, animationDelay: "0.08s" }}>
           <div
             style={{
               fontFamily: FONTS.mono,
@@ -260,7 +248,7 @@ export default function Dashboard() {
                 background: `linear-gradient(${COLORS.green}, ${COLORS.border})`,
               }}
             />
-            {skillPath.map((node, i) => {
+            {skillPath.map((node) => {
               const isDone = node.state === "done";
               const isActive = node.state === "active";
               const dotColor = isDone ? COLORS.green : isActive ? COLORS.blue : COLORS.comment;
@@ -268,13 +256,7 @@ export default function Dashboard() {
                 <div
                   key={node.name}
                   className="node-row"
-                  style={{
-                    position: "relative",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "16px",
-                    padding: "13px 0",
-                  }}
+                  style={{ position: "relative", display: "flex", alignItems: "center", gap: "16px", padding: "13px 0" }}
                 >
                   <div
                     style={{
@@ -294,7 +276,7 @@ export default function Dashboard() {
                       color: isDone ? COLORS.bgDark : dotColor,
                     }}
                   >
-                    {isDone ? "\u2713" : isActive ? "" : "\u00b7"}
+                    {isDone ? "✓" : isActive ? "" : "·"}
                   </div>
                   <span
                     className="node-label"
@@ -314,10 +296,7 @@ export default function Dashboard() {
         </div>
 
         {/* Center: lesson terminal */}
-        <div
-          className="reveal"
-          style={{ flex: 1, minWidth: 0, animationDelay: "0.16s" }}
-        >
+        <div className="reveal" style={{ flex: 1, minWidth: 0, animationDelay: "0.16s" }}>
           <div style={{ marginBottom: "18px" }}>
             <div
               style={{
@@ -329,7 +308,7 @@ export default function Dashboard() {
                 marginBottom: "6px",
               }}
             >
-              Lesson 07
+              Lesson {String(lesson.lessonNumber).padStart(2, "0")}
             </div>
             <h1
               style={{
@@ -372,40 +351,12 @@ export default function Dashboard() {
                 <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: COLORS.yellow }} />
                 <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: COLORS.green }} />
               </div>
-              <span
-                style={{
-                  fontFamily: FONTS.mono,
-                  fontSize: "12px",
-                  color: COLORS.fgDim,
-                  marginLeft: "6px",
-                }}
-              >
-                two-pointers.js
+              <span style={{ fontFamily: FONTS.mono, fontSize: "12px", color: COLORS.fgDim, marginLeft: "6px" }}>
+                {lesson.filename}
               </span>
             </div>
 
-            <div style={{ display: "flex", fontFamily: FONTS.mono, fontSize: "13.5px", lineHeight: "1.9" }}>
-              <div
-                style={{
-                  padding: "18px 14px",
-                  color: COLORS.comment,
-                  textAlign: "right",
-                  userSelect: "none",
-                  borderRight: `1px solid ${COLORS.border}`,
-                }}
-              >
-                {codeLines.map((l) => (
-                  <div key={l.n}>{l.n}</div>
-                ))}
-              </div>
-              <div style={{ padding: "18px 20px", overflowX: "auto", flex: 1 }}>
-                {codeLines.map((l) => (
-                  <div key={l.n} style={{ whiteSpace: "pre" }}>
-                    <SyntaxLine tokens={l.tokens} />
-                  </div>
-                ))}
-              </div>
-            </div>
+            <CodeEditor value={code} onChange={setCode} height="280px" />
 
             {/* Run bar */}
             <div
@@ -421,6 +372,7 @@ export default function Dashboard() {
               <button
                 className="run-btn"
                 onClick={handleRun}
+                disabled={piston.isLoading}
                 style={{
                   background: COLORS.green,
                   color: COLORS.bgDark,
@@ -430,7 +382,8 @@ export default function Dashboard() {
                   fontFamily: FONTS.mono,
                   fontWeight: 600,
                   fontSize: "13px",
-                  cursor: "pointer",
+                  cursor: piston.isLoading ? "default" : "pointer",
+                  opacity: piston.isLoading ? 0.7 : 1,
                   transition: "all 0.15s ease",
                   display: "flex",
                   alignItems: "center",
@@ -440,7 +393,7 @@ export default function Dashboard() {
                 &#9654; Run tests
               </button>
               <span style={{ fontFamily: FONTS.mono, fontSize: "12px", color: COLORS.fgDim }}>
-                3 test cases
+                {lesson.testCases.length} test cases
               </span>
             </div>
 
@@ -452,46 +405,23 @@ export default function Dashboard() {
                 fontFamily: FONTS.mono,
                 fontSize: "12.5px",
                 minHeight: "76px",
-                animation: runState === "success" ? "successFlash 1.2s ease forwards" : "none",
+                animation: allPassed ? "successFlash 1.2s ease forwards" : "none",
               }}
             >
-              {runState === "idle" && (
-                <span style={{ color: COLORS.comment }}>&gt; awaiting run&hellip;</span>
-              )}
-              {runState === "compiling" && (
-                <div style={{ display: "flex", alignItems: "center", gap: "10px", color: COLORS.fgDim }}>
-                  <div
-                    style={{
-                      width: "13px",
-                      height: "13px",
-                      border: `2px solid ${COLORS.border}`,
-                      borderTopColor: COLORS.blue,
-                      borderRadius: "50%",
-                      animation: "spin 0.7s linear infinite",
-                    }}
-                  />
-                  compiling and running test cases&hellip;
-                </div>
-              )}
-              {runState === "success" && (
-                <div style={{ color: COLORS.green, display: "flex", flexDirection: "column", gap: "3px" }}>
-                  <span>&#10003; test 1 passed &mdash; [2,7,11,15], target 9</span>
-                  <span>&#10003; test 2 passed &mdash; [3,2,4], target 6</span>
-                  <span>&#10003; test 3 passed &mdash; [-1,0,1,2], target 1</span>
-                  <span style={{ color: COLORS.fg, marginTop: "4px" }}>
-                    3/3 passed &middot; runtime 0.4ms &middot; +40 XP
-                  </span>
-                </div>
-              )}
+              <OutputPanel
+                state={outputState}
+                error={piston.error}
+                results={piston.results}
+                runtimeMs={piston.runtimeMs}
+                memoryBytes={piston.memoryBytes}
+                testCount={lesson.testCases.length}
+              />
             </div>
           </div>
         </div>
 
         {/* Right: stats */}
-        <div
-          className="reveal"
-          style={{ width: "220px", flexShrink: 0, animationDelay: "0.24s" }}
-        >
+        <div className="reveal" style={{ width: "220px", flexShrink: 0, animationDelay: "0.24s" }}>
           <div
             style={{
               background: COLORS.raised,
