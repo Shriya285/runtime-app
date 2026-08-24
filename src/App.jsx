@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import Dashboard from "./components/Dashboard";
-import SassyBot from "./components/SassyBot";
+import SassyBotMount from "./components/SassyBotMount";
 import SassyToast from "./components/SassyToast";
 import { useMoodState } from "./lib/useMoodState";
 import { useSassyBotSentiment } from "./lib/useSassyBotSentiment";
@@ -47,17 +47,11 @@ export default function App() {
 
   return (
     <div style={{ position: "relative" }}>
-      <div
-        style={{
-          position: "fixed",
-          top: "18px",
-          left: "50%",
-          transform: "translateX(-50%)",
-          zIndex: 200,
-        }}
-      >
-        <SassyBot sentiment={sentiment} onAutoSassy={handleAutoSassy} />
-      </div>
+      <SassyBotMount
+        sentiment={sentiment}
+        streak={moodState ? moodState.streak : 0}
+        onAutoSassy={handleAutoSassy}
+      />
 
       {toast && (
         <SassyToast

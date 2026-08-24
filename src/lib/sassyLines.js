@@ -41,6 +41,33 @@ export const MILESTONE_LINES = [
   (streak) => `${streak}-day streak. I'd say I'm surprised but that would be rude. Mostly.`,
 ];
 
+// SassyBot's code-run reactions (thinking/cheer/annoyed/angry from Piston
+// results) reuse the same pickLine() lookup, keyed by sentiment instead of
+// absence-mood — same tone, different trigger.
+export const CHEER_LINES = [
+  "Nailed it. I'm mildly impressed, don't let it go to your head.",
+  "All green. Somewhere a whiteboard interviewer is crying tears of joy.",
+  "Look at you, actually shipping working code.",
+];
+
+export const THINKING_LINES = [
+  "Running it. Hold your horses.",
+  "Compiling your hopes and dreams...",
+  "Let's see what Piston has to say about this.",
+];
+
+export const ANNOYED_LINES = [
+  "Some of that passed. Some. Not thrilled, not furious.",
+  "Halfway there. I've seen worse. I've also seen better.",
+  "You're testing my patience and your test cases, in that order.",
+];
+
+export const ANGRY_LINES = [
+  "Zero for zero. That's not a typo, that's your run.",
+  "Every single test failed. Bold. Reckless. Impressive, actually.",
+  "I'd say try again, but maybe read the error first this time.",
+];
+
 export function pickLine(mood, streak) {
   const banks = {
     idle: IDLE_LINES,
@@ -48,6 +75,10 @@ export function pickLine(mood, streak) {
     sassy: SASSY_LINES,
     savage: SAVAGE_LINES,
     return_on_time: RETURN_ON_TIME_LINES,
+    cheer: CHEER_LINES,
+    thinking: THINKING_LINES,
+    annoyed: ANNOYED_LINES,
+    angry: ANGRY_LINES,
   };
   if (mood === "milestone") {
     const fn = MILESTONE_LINES[Math.floor(Math.random() * MILESTONE_LINES.length)];

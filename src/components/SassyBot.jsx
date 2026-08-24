@@ -13,35 +13,35 @@ const BOREDOM_MS = 2800;
 
 function eyeStyle(sentiment, side) {
   const base = {
-    width: "26px",
+    width: "8px",
     transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
   };
 
   if (sentiment === "sassy") {
-    return { ...base, height: "19px", borderRadius: "50px", transform: "translateX(8px)" };
+    return { ...base, height: "6px", borderRadius: "50px", transform: "translateX(2.5px)" };
   }
   if (sentiment === "cheer") {
     return {
       ...base,
-      width: "30px",
-      height: "20px",
+      width: "9px",
+      height: "6px",
       borderRadius: "50px 50px 0 0",
       transform: "scale(1.15)",
     };
   }
   if (sentiment === "thinking") {
     const squinted = side === "left";
-    return { ...base, height: squinted ? "6px" : "40px", borderRadius: "50px", transform: "translateX(0)" };
+    return { ...base, height: squinted ? "2px" : "12px", borderRadius: "50px", transform: "translateX(0)" };
   }
   if (sentiment === "annoyed") {
     const isLeft = side === "left";
-    return { ...base, height: isLeft ? "12px" : "18px", borderRadius: "50px", transform: "translateX(0)" };
+    return { ...base, height: isLeft ? "4px" : "6px", borderRadius: "50px", transform: "translateX(0)" };
   }
   if (sentiment === "angry") {
     const angle = side === "left" ? -22 : 22;
-    return { ...base, height: "7px", borderRadius: "50px", transform: `rotate(${angle}deg)` };
+    return { ...base, height: "2px", borderRadius: "50px", transform: `rotate(${angle}deg)` };
   }
-  return { ...base, height: "42px", borderRadius: "50px", transform: "scale(1)" };
+  return { ...base, height: "13px", borderRadius: "50px", transform: "scale(1)" };
 }
 
 function PixelLoader({ color }) {
@@ -49,14 +49,14 @@ function PixelLoader({ color }) {
     <div
       style={{
         position: "absolute",
-        bottom: "-16px",
+        bottom: "-5px",
         left: "50%",
-        marginLeft: "-6px",
-        width: "12px",
-        height: "12px",
+        marginLeft: "-2px",
+        width: "4px",
+        height: "4px",
         display: "grid",
         gridTemplateColumns: "1fr 1fr",
-        gap: "1.5px",
+        gap: "0.5px",
         animation: "loaderSpin 1.6s linear infinite",
       }}
     >
@@ -64,11 +64,11 @@ function PixelLoader({ color }) {
         <div
           key={i}
           style={{
-            width: "4.5px",
-            height: "4.5px",
+            width: "1.5px",
+            height: "1.5px",
             background: color,
             opacity: i === 0 ? 1 : 0.35,
-            boxShadow: i === 0 ? `0 0 4px ${color}` : "none",
+            boxShadow: i === 0 ? `0 0 1.5px ${color}` : "none",
           }}
         />
       ))}
@@ -86,11 +86,11 @@ function CheerSparks({ color }) {
             position: "absolute",
             top: "50%",
             left: `${28 + i * 22}%`,
-            width: "4px",
-            height: "4px",
+            width: "1.5px",
+            height: "1.5px",
             borderRadius: "50%",
             background: color,
-            boxShadow: `0 0 6px ${color}`,
+            boxShadow: `0 0 2px ${color}`,
             animation: "sparkBurst 0.9s ease-out infinite",
             animationDelay: `${i * 0.18}s`,
           }}
@@ -132,9 +132,9 @@ export function SassyBot({ sentiment = "idle", onAutoSassy }) {
       const rect = chassisRef.current.getBoundingClientRect();
       const cx = rect.left + rect.width / 2;
       const cy = rect.top + rect.height / 2;
-      const dx = ((e.clientX - cx) / (rect.width / 2)) * 3.5;
-      const dy = ((e.clientY - cy) / (rect.height / 2)) * 3.5;
-      setCursorOffset({ x: Math.max(-4, Math.min(4, dx)), y: Math.max(-4, Math.min(4, dy)) });
+      const dx = ((e.clientX - cx) / (rect.width / 2)) * 1.1;
+      const dy = ((e.clientY - cy) / (rect.height / 2)) * 1.1;
+      setCursorOffset({ x: Math.max(-1.2, Math.min(1.2, dx)), y: Math.max(-1.2, Math.min(1.2, dy)) });
       setTilt(dx > 0 ? -3 : 3);
       resetBoredomTimer();
     },
@@ -178,12 +178,12 @@ export function SassyBot({ sentiment = "idle", onAutoSassy }) {
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       style={{
-        width: "156px",
-        height: "124px",
-        borderRadius: "34px",
+        width: "48px",
+        height: "38px",
+        borderRadius: "10px",
         background: "linear-gradient(155deg, #1C1F28, #101218)",
         border: "1px solid #2A2E3A",
-        boxShadow: `0 0 24px ${theme.glow}22, 0 16px 34px -16px rgba(0,0,0,0.75)`,
+        boxShadow: `0 0 8px ${theme.glow}22, 0 5px 10px -5px rgba(0,0,0,0.75)`,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -192,21 +192,22 @@ export function SassyBot({ sentiment = "idle", onAutoSassy }) {
         transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease",
         cursor: "pointer",
         position: "relative",
+        flexShrink: 0,
       }}
     >
       {sentiment === "cheer" && <CheerSparks color={theme.glow} />}
 
       <div
         style={{
-          width: "120px",
-          height: "84px",
-          borderRadius: "22px",
+          width: "37px",
+          height: "26px",
+          borderRadius: "7px",
           background: visorBg,
           border: "1px solid rgba(255,255,255,0.05)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          gap: "16px",
+          gap: "5px",
           position: "relative",
           overflow: "visible",
           transition: "background 0.35s ease",
@@ -217,7 +218,7 @@ export function SassyBot({ sentiment = "idle", onAutoSassy }) {
             style={{
               position: "absolute",
               inset: 0,
-              borderRadius: "22px",
+              borderRadius: "7px",
               background: "#FF2E2E",
               animation: "angryPulse 0.55s ease-in-out infinite",
               pointerEvents: "none",
@@ -230,7 +231,7 @@ export function SassyBot({ sentiment = "idle", onAutoSassy }) {
             style={{
               ...leftEye,
               background: theme.glow,
-              boxShadow: `0 0 12px ${theme.glow}`,
+              boxShadow: `0 0 4px ${theme.glow}`,
               transform: `translate(${cursorOffset.x}px, ${cursorOffset.y}px) ${leftEye.transform}${blinkTransform}`,
             }}
           />
@@ -241,7 +242,7 @@ export function SassyBot({ sentiment = "idle", onAutoSassy }) {
           style={{
             ...rightEye,
             background: theme.glow,
-            boxShadow: `0 0 12px ${theme.glow}`,
+            boxShadow: `0 0 4px ${theme.glow}`,
             transform: `translate(${cursorOffset.x}px, ${cursorOffset.y}px) ${rightEye.transform}${blinkTransform}`,
           }}
         />
@@ -250,13 +251,13 @@ export function SassyBot({ sentiment = "idle", onAutoSassy }) {
       <style>{`
         @keyframes breathe {
           from { transform: translateY(0) scaleY(1); }
-          to { transform: translateY(-3px) scaleY(1.015); }
+          to { transform: translateY(-1px) scaleY(1.015); }
         }
         @keyframes cheerHop {
           0%, 100% { transform: translateY(0) scaleY(1); }
-          40% { transform: translateY(-14px) scaleY(1.05); }
+          40% { transform: translateY(-4px) scaleY(1.05); }
           55% { transform: translateY(0) scaleY(0.92); }
-          70% { transform: translateY(-4px) scaleY(1.02); }
+          70% { transform: translateY(-1px) scaleY(1.02); }
         }
         @keyframes annoyedShake {
           0%, 100% { transform: rotate(-4deg); }
@@ -264,9 +265,9 @@ export function SassyBot({ sentiment = "idle", onAutoSassy }) {
         }
         @keyframes angryShake {
           0% { transform: translateX(0); }
-          25% { transform: translateX(-5px); }
-          50% { transform: translateX(5px); }
-          75% { transform: translateX(-4px); }
+          25% { transform: translateX(-1.5px); }
+          50% { transform: translateX(1.5px); }
+          75% { transform: translateX(-1px); }
           100% { transform: translateX(0); }
         }
         @keyframes angryPulse {
@@ -275,7 +276,7 @@ export function SassyBot({ sentiment = "idle", onAutoSassy }) {
         }
         @keyframes sparkBurst {
           0% { transform: translateY(0) scale(1); opacity: 0.9; }
-          100% { transform: translateY(-30px) scale(0.3); opacity: 0; }
+          100% { transform: translateY(-9px) scale(0.3); opacity: 0; }
         }
         @keyframes loaderSpin {
           from { transform: rotate(0deg); }
