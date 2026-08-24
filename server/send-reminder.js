@@ -16,8 +16,9 @@
 //   3. A place to store push subscriptions per user (MongoDB Atlas, same
 //      as the rest of your stack) — created when the user grants
 //      notification permission and calls pushManager.subscribe()
-//   4. vercel.json cron config to run this on a schedule (see vercel.json
-//      in this repo)
+//   4. Move this file (and send-digest.js) into /api/, then wire up
+//      vercel.json's functions/crons config — see the detailed note in
+//      send-digest.js for exactly why and what that config looks like.
 //
 // Below is the shape of what that function looks like once wired up.
 

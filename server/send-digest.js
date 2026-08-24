@@ -12,8 +12,19 @@
 //   3. A place to store each user's email + lastActiveAt — same store as
 //      send-reminder.js's push subscriptions (MongoDB Atlas). See
 //      subscribe-email.js for how an email gets in there.
-//   4. vercel.json cron config to run this on a schedule (see vercel.json
-//      in this repo — currently hourly, same as send-reminder.js)
+//   4. Move this file (and send-reminder.js) into /api/ — Vercel's
+//      zero-config functions directory. `functions`/`crons` in
+//      vercel.json only match files under /api/, confirmed the hard way:
+//      pointing them at server/*.js broke every deployment ("doesn't
+//      match any Serverless Functions inside the api directory"), which
+//      is why vercel.json is empty right now. Once moved, add back:
+//        "functions": { "api/send-reminder.js": { "maxDuration": 10 },
+//                       "api/send-digest.js": { "maxDuration": 10 } },
+//        "crons": [ { "path": "/api/send-reminder", "schedule": "..." },
+//                    { "path": "/api/send-digest", "schedule": "..." } ]
+//      Hobby-plan accounts are also capped at once-daily cron runs (an
+//      hourly schedule fails deployment outright) — Pro removes that cap
+//      if you want finer-grained absence checks than once a day.
 //
 // Below is the shape of what that function looks like once wired up.
 
