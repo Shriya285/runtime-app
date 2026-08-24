@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import CodeEditor from "./CodeEditor";
 import OutputPanel from "./OutputPanel";
 import LeetCodeLinkField from "./LeetCodeLinkField";
+import AvatarInitials from "./AvatarInitials";
 import { CURRENT_LESSON } from "../lib/lessons";
 import { usePistonExecutionContext } from "../lib/PistonExecutionContext";
 
@@ -202,15 +203,7 @@ export default function Dashboard() {
         >
           <span style={{ color: COLORS.orange }}>&#9679; 14 day streak</span>
           <span>1,240 XP</span>
-          <div
-            style={{
-              width: "30px",
-              height: "30px",
-              borderRadius: "8px",
-              background: COLORS.raised,
-              border: `1px solid ${COLORS.border}`,
-            }}
-          />
+          <AvatarInitials />
         </div>
       </div>
 
