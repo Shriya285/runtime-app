@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import CodeEditor from "./CodeEditor";
 import OutputPanel from "./OutputPanel";
+import LeetCodeLinkField from "./LeetCodeLinkField";
 import { CURRENT_LESSON } from "../lib/lessons";
 import { usePistonExecutionContext } from "../lib/PistonExecutionContext";
 
@@ -395,6 +396,17 @@ export default function Dashboard() {
               <span style={{ fontFamily: FONTS.mono, fontSize: "12px", color: COLORS.fgDim }}>
                 {lesson.testCases.length} test cases
               </span>
+            </div>
+
+            {/* Solved elsewhere */}
+            <div
+              style={{
+                borderTop: `1px solid ${COLORS.border}`,
+                padding: "12px 20px",
+                background: COLORS.surface,
+              }}
+            >
+              <LeetCodeLinkField lessonId={lesson.id} />
             </div>
 
             {/* Output panel */}
