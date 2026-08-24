@@ -62,17 +62,27 @@ const skillPath = [
   { name: "Trees & Recursion", state: "locked" },
 ];
 
-function codeStorageKey(lessonId) {
-  return `runtime_code_${lessonId}`;
+function codeStorageKey(lessonId, language) {
+  return `runtime_code_${lessonId}_${language}`;
+}
+
+function languageStorageKey(lessonId) {
+  return `runtime_language_${lessonId}`;
 }
 
 export default function Dashboard({ onSolutionRevealedEarly }) {
   const lesson = CURRENT_LESSON;
+  const availableLanguages = Object.keys(lesson.languages);
   const execution = useCodeExecutionContext();
   const typedTitle = useTypedText(lesson.title, 55, 300);
 
+  const [language, setLanguage] = useState(
+    () => localStorage.getItem(languageStorageKey(lesson.id)) || lesson.defaultLanguage
+  );
+  const variant = lesson.languages[language];
+
   const [code, setCode] = useState(
-    () => localStorage.getItem(codeStorageKey(lesson.id)) || lesson.starterCode
+    () => localStorage.getItem(codeStorageKey(lesson.id, language)) || variant.starterCode
   );
   const [solutionRevealed, setSolutionRevealed] = useState(false);
   const [completion, setCompletion] = useState(null); // { reason } | null
@@ -80,8 +90,19 @@ export default function Dashboard({ onSolutionRevealedEarly }) {
   const [reviewRefreshKey, setReviewRefreshKey] = useState(0);
 
   useEffect(() => {
-    localStorage.setItem(codeStorageKey(lesson.id), code);
-  }, [code, lesson.id]);
+    localStorage.setItem(codeStorageKey(lesson.id, language), code);
+  }, [code, lesson.id, language]);
+
+  useEffect(() => {
+    localStorage.setItem(languageStorageKey(lesson.id), language);
+  }, [language, lesson.id]);
+
+  const handleLanguageChange = (nextLanguage) => {
+    if (nextLanguage === language) return;
+    setLanguage(nextLanguage);
+    setCode(localStorage.getItem(codeStorageKey(lesson.id, nextLanguage)) || lesson.languages[nextLanguage].starterCode);
+    setSolutionRevealed(false);
+  };
 
   // Offer the trigger/core-idea prompt whenever a run comes back all-passed.
   useEffect(() => {
@@ -94,11 +115,11 @@ export default function Dashboard({ onSolutionRevealedEarly }) {
   }, [execution.lastRunSummary]);
 
   const handleRun = () => {
-    execution.runTests(code);
+    execution.runTests(code, { language, entryPoint: variant.entryPoint });
   };
 
   const handleReveal = (wasEarly) => {
-    setCode(lesson.solutionCode);
+    setCode(variant.solutionCode);
     setSolutionRevealed(true);
     if (wasEarly) onSolutionRevealedEarly && onSolutionRevealedEarly();
     setCompletion({ reason: "solution-revealed" });
@@ -382,11 +403,32 @@ export default function Dashboard({ onSolutionRevealedEarly }) {
                 <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: COLORS.green }} />
               </div>
               <span style={{ fontFamily: FONTS.mono, fontSize: "12px", color: COLORS.fgDim, marginLeft: "6px" }}>
-                {lesson.filename}
+                {variant.filename}
               </span>
+              <div style={{ flex: 1 }} />
+              <div style={{ display: "flex", gap: "4px" }}>
+                {availableLanguages.map((lang) => (
+                  <button
+                    key={lang}
+                    onClick={() => handleLanguageChange(lang)}
+                    style={{
+                      background: lang === language ? COLORS.raised : "transparent",
+                      border: `1px solid ${lang === language ? COLORS.blue : COLORS.border}`,
+                      borderRadius: "6px",
+                      padding: "3px 9px",
+                      fontFamily: FONTS.mono,
+                      fontSize: "11px",
+                      color: lang === language ? COLORS.fg : COLORS.fgDim,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {lesson.languages[lang].label}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <CodeEditor value={code} onChange={setCode} height="280px" />
+            <CodeEditor value={code} onChange={setCode} height="280px" language={language} />
 
             {/* Run bar */}
             <div

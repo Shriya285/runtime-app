@@ -1,6 +1,7 @@
 import React from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { javascript } from "@codemirror/lang-javascript";
+import { python } from "@codemirror/lang-python";
 import { tokyoNight } from "@uiw/codemirror-theme-tokyo-night";
 import { EditorView } from "@codemirror/view";
 
@@ -10,8 +11,14 @@ const editorTheme = EditorView.theme({
   ".cm-gutters": { fontFamily: "'JetBrains Mono', monospace" },
 });
 
-export default function CodeEditor({ value, onChange, readOnly = false, height = "300px" }) {
-  const extensions = [javascript({ jsx: false }), editorTheme];
+const LANGUAGE_EXTENSIONS = {
+  javascript: () => javascript({ jsx: false }),
+  python: () => python(),
+};
+
+export default function CodeEditor({ value, onChange, readOnly = false, height = "300px", language = "javascript" }) {
+  const languageExtension = (LANGUAGE_EXTENSIONS[language] || LANGUAGE_EXTENSIONS.javascript)();
+  const extensions = [languageExtension, editorTheme];
 
   return (
     <CodeMirror

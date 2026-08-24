@@ -9,10 +9,10 @@ const RESULT_MARKER = "__RUNTIME_RESULTS__";
 // is passed through as a JSON string (parsed with JSON.parse/json.loads at
 // runtime) rather than interpolated as source-language literals, so it
 // works the same regardless of target language.
-function buildDriverSource(lesson, userCode) {
-  const testsJson = JSON.stringify(lesson.testCases);
+function buildDriverSource({ language, entryPoint, testCases }, userCode) {
+  const testsJson = JSON.stringify(testCases);
 
-  if (lesson.language === "python") {
+  if (language === "python") {
     return [
       userCode,
       "",
@@ -21,7 +21,7 @@ function buildDriverSource(lesson, userCode) {
       "__results__ = []",
       "for __t in __TESTS__:",
       "    try:",
-      `        __actual = ${lesson.entryPoint}(*__t["args"])`,
+      `        __actual = ${entryPoint}(*__t["args"])`,
       '        __results__.append({"passed": __actual == __t["expected"], "actual": __actual, "expected": __t["expected"], "args": __t["args"], "error": None})',
       "    except Exception as __e:",
       '        __results__.append({"passed": False, "actual": None, "expected": __t["expected"], "args": __t["args"], "error": str(__e)})',
@@ -37,7 +37,7 @@ function buildDriverSource(lesson, userCode) {
     `const __TESTS__ = JSON.parse(${JSON.stringify(testsJson)});`,
     "const __results__ = __TESTS__.map((t) => {",
     "  try {",
-    `    const actual = ${lesson.entryPoint}(...t.args);`,
+    `    const actual = ${entryPoint}(...t.args);`,
     "    return { passed: JSON.stringify(actual) === JSON.stringify(t.expected), actual, expected: t.expected, args: t.args, error: null };",
     "  } catch (err) {",
     "    return { passed: false, actual: null, expected: t.expected, args: t.args, error: String((err && err.message) || err) };",
@@ -49,12 +49,17 @@ function buildDriverSource(lesson, userCode) {
 }
 
 /**
- * Owns real code-execution state for a lesson: loading, per-test results,
- * and a `lastRunSummary` that flips to a fresh object each time a run
- * completes (pass/fail/total) — the signal App.jsx watches to drive
+ * Owns real code-execution state for a lesson's test cases (language-
+ * agnostic), and a `lastRunSummary` that flips to a fresh object each time
+ * a run completes (pass/fail/total) — the signal App.jsx watches to drive
  * useSassyBotSentiment's thinking/cheer/annoyed/angry reactions.
+ *
+ * `runTests(userCode, { language, entryPoint })` takes the language-specific
+ * bits per call rather than at hook-creation time, since which language is
+ * active can change (a lesson may offer more than one) without needing a
+ * new hook instance.
  */
-export function useCodeExecution(lesson) {
+export function useCodeExecution(testCases) {
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState(null);
   const [lastRunSummary, setLastRunSummary] = useState(null);
@@ -64,13 +69,13 @@ export function useCodeExecution(lesson) {
   const runIdRef = useRef(0);
 
   const runTests = useCallback(
-    async (userCode) => {
+    async (userCode, { language, entryPoint }) => {
       const runId = ++runIdRef.current;
       setIsLoading(true);
       setError(null);
       setLastRunSummary(null);
 
-      const total = lesson.testCases.length;
+      const total = testCases.length;
       const failAll = (message) => {
         if (runId !== runIdRef.current) return; // superseded by a newer run
         setError(message);
@@ -79,9 +84,9 @@ export function useCodeExecution(lesson) {
       };
 
       try {
-        const source = buildDriverSource(lesson, userCode);
+        const source = buildDriverSource({ language, entryPoint, testCases }, userCode);
         const { stdout, stderr, wallTimeMs, memoryBytes: mem } = await executeCode({
-          language: lesson.language,
+          language,
           source,
         });
         if (runId !== runIdRef.current) return;
@@ -104,7 +109,7 @@ export function useCodeExecution(lesson) {
         if (runId === runIdRef.current) setIsLoading(false);
       }
     },
-    [lesson]
+    [testCases]
   );
 
   return {
@@ -115,6 +120,6 @@ export function useCodeExecution(lesson) {
     memoryBytes,
     error,
     runTests,
-    testCount: lesson.testCases.length,
+    testCount: testCases.length,
   };
 }
