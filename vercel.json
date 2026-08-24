@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "server/send-reminder.js": {},
+    "server/send-digest.js": {}
+  },
+  "crons": [
+    { "path": "/server/send-reminder", "schedule": "0 * * * *" },
+    { "path": "/server/send-digest", "schedule": "0 * * * *" }
+  ]
+}

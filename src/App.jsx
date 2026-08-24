@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import Dashboard from "./components/Dashboard";
 import SassyBotMount from "./components/SassyBotMount";
 import SassyToast from "./components/SassyToast";
+import EmailDigestOptIn from "./components/EmailDigestOptIn";
 import { useMoodState } from "./lib/useMoodState";
 import { useSassyBotSentiment } from "./lib/useSassyBotSentiment";
 import { usePistonExecution } from "./lib/usePistonExecution";
@@ -80,45 +81,56 @@ export default function App() {
         />
       )}
 
-      {/* Reminder opt-in — sits above the dashboard, dismiss-able in real use */}
-      {permission !== "granted" && permission !== "unsupported" && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: "20px",
-            right: "20px",
-            zIndex: 250,
-            background: "#1C1E2A",
-            border: "1px solid #2E3244",
-            borderRadius: "10px",
-            padding: "12px 16px",
-            fontFamily: "'JetBrains Mono', monospace",
-            fontSize: "12px",
-            color: "#C0CAF5",
-            maxWidth: "260px",
-          }}
-        >
-          Let runtime. remind you (nicely, then not so nicely) if you go quiet?
-          <button
-            onClick={handleEnableReminders}
+      {/* Notification channels — sit above the dashboard, bottom-right */}
+      <div
+        style={{
+          position: "fixed",
+          bottom: "20px",
+          right: "20px",
+          zIndex: 250,
+          display: "flex",
+          flexDirection: "column",
+          gap: "12px",
+          alignItems: "flex-end",
+        }}
+      >
+        {permission !== "granted" && permission !== "unsupported" && (
+          <div
             style={{
-              display: "block",
-              marginTop: "8px",
-              background: "#7AA2F7",
-              color: "#0D0E15",
-              border: "none",
-              borderRadius: "6px",
-              padding: "6px 12px",
+              background: "#1C1E2A",
+              border: "1px solid #2E3244",
+              borderRadius: "10px",
+              padding: "12px 16px",
               fontFamily: "'JetBrains Mono', monospace",
-              fontWeight: 600,
-              fontSize: "11.5px",
-              cursor: "pointer",
+              fontSize: "12px",
+              color: "#C0CAF5",
+              maxWidth: "260px",
             }}
           >
-            Enable reminders
-          </button>
-        </div>
-      )}
+            Let runtime. remind you (nicely, then not so nicely) if you go quiet?
+            <button
+              onClick={handleEnableReminders}
+              style={{
+                display: "block",
+                marginTop: "8px",
+                background: "#7AA2F7",
+                color: "#0D0E15",
+                border: "none",
+                borderRadius: "6px",
+                padding: "6px 12px",
+                fontFamily: "'JetBrains Mono', monospace",
+                fontWeight: 600,
+                fontSize: "11.5px",
+                cursor: "pointer",
+              }}
+            >
+              Enable reminders
+            </button>
+          </div>
+        )}
+
+        <EmailDigestOptIn />
+      </div>
 
       <PistonExecutionContext.Provider value={piston}>
         <Dashboard onSolutionRevealedEarly={reportSolutionRevealedEarly} />

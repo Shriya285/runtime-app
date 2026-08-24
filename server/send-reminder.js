@@ -3,6 +3,12 @@
 // Vercel Cron Job -> serverless function -> checks last-active per user ->
 // sends a real push via the `web-push` library.
 //
+// Push only covers the 6-24h nudge tier now — a push notification only
+// reaches you if the OS delivers it and you happen to be looking, which
+// gets less reliable the longer you've been gone. 24h+ and 48h+ absence
+// are handled by the email digest instead (see send-digest.js), which
+// survives days of not having the app open.
+//
 // To make this real, you'd need:
 //   1. `npm install web-push` in a deployed Vercel project
 //   2. VAPID keys: `npx web-push generate-vapid-keys` — store the public
@@ -10,8 +16,8 @@
 //   3. A place to store push subscriptions per user (MongoDB Atlas, same
 //      as the rest of your stack) — created when the user grants
 //      notification permission and calls pushManager.subscribe()
-//   4. vercel.json cron config to run this on a schedule, e.g. hourly,
-//      checking who's crossed the 6h / 24h / 48h absence thresholds
+//   4. vercel.json cron config to run this on a schedule (see vercel.json
+//      in this repo)
 //
 // Below is the shape of what that function looks like once wired up.
 
@@ -25,10 +31,8 @@ webpush.setVapidDetails(
 );
 
 function tierForGapHours(hours) {
-  if (hours >= 48) return "savage";
-  if (hours >= 24) return "sassy";
-  if (hours >= 6) return "nudge";
-  return null;
+  if (hours >= 6 && hours < 24) return "nudge";
+  return null; // 24h+ is the email digest's job now — see send-digest.js
 }
 
 export default async function handler(req, res) {
