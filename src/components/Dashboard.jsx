@@ -3,8 +3,12 @@ import CodeEditor from "./CodeEditor";
 import OutputPanel from "./OutputPanel";
 import LeetCodeLinkField from "./LeetCodeLinkField";
 import AvatarInitials from "./AvatarInitials";
-import { CURRENT_LESSON } from "../lib/lessons";
+import StruggleTimer from "./StruggleTimer";
+import CompletionPrompt from "./CompletionPrompt";
+import DueForReview from "./DueForReview";
+import { CURRENT_LESSON, LESSONS } from "../lib/lessons";
 import { usePistonExecutionContext } from "../lib/PistonExecutionContext";
+import { recordCompletion } from "../lib/spacedRepetition";
 
 const COLORS = {
   bg: "#1A1B26",
@@ -62,7 +66,7 @@ function codeStorageKey(lessonId) {
   return `runtime_code_${lessonId}`;
 }
 
-export default function Dashboard() {
+export default function Dashboard({ onSolutionRevealedEarly }) {
   const lesson = CURRENT_LESSON;
   const piston = usePistonExecutionContext();
   const typedTitle = useTypedText(lesson.title, 55, 300);
@@ -70,13 +74,41 @@ export default function Dashboard() {
   const [code, setCode] = useState(
     () => localStorage.getItem(codeStorageKey(lesson.id)) || lesson.starterCode
   );
+  const [solutionRevealed, setSolutionRevealed] = useState(false);
+  const [completion, setCompletion] = useState(null); // { reason } | null
+  const [promptDismissed, setPromptDismissed] = useState(false);
+  const [reviewRefreshKey, setReviewRefreshKey] = useState(0);
 
   useEffect(() => {
     localStorage.setItem(codeStorageKey(lesson.id), code);
   }, [code, lesson.id]);
 
+  // Offer the trigger/core-idea prompt whenever a run comes back all-passed.
+  useEffect(() => {
+    if (!piston.lastRunSummary) return;
+    const { passed, total } = piston.lastRunSummary;
+    if (total > 0 && passed === total) {
+      setCompletion({ reason: "tests-passed" });
+      setPromptDismissed(false);
+    }
+  }, [piston.lastRunSummary]);
+
   const handleRun = () => {
     piston.runTests(code);
+  };
+
+  const handleReveal = (wasEarly) => {
+    setCode(lesson.solutionCode);
+    setSolutionRevealed(true);
+    if (wasEarly) onSolutionRevealedEarly && onSolutionRevealedEarly();
+    setCompletion({ reason: "solution-revealed" });
+    setPromptDismissed(false);
+  };
+
+  const handleSaveCompletion = ({ trigger, coreIdea }) => {
+    recordCompletion(lesson.id, { trigger, coreIdea, reason: completion.reason });
+    setCompletion(null);
+    setReviewRefreshKey((k) => k + 1);
   };
 
   const outputState = piston.isLoading
@@ -320,6 +352,10 @@ export default function Dashboard() {
             </h1>
           </div>
 
+          <div style={{ marginBottom: "14px" }}>
+            <StruggleTimer lessonId={lesson.id} onReveal={handleReveal} revealed={solutionRevealed} />
+          </div>
+
           {/* Terminal chrome */}
           <div
             style={{
@@ -422,11 +458,22 @@ export default function Dashboard() {
                 testCount={lesson.testCases.length}
               />
             </div>
+
+            {completion && !promptDismissed && (
+              <div style={{ padding: "0 20px 20px" }}>
+                <CompletionPrompt
+                  reason={completion.reason}
+                  onSave={handleSaveCompletion}
+                  onDismiss={() => setPromptDismissed(true)}
+                />
+              </div>
+            )}
           </div>
         </div>
 
         {/* Right: stats */}
         <div className="reveal" style={{ width: "220px", flexShrink: 0, animationDelay: "0.24s" }}>
+          <DueForReview lessons={LESSONS} refreshKey={reviewRefreshKey} />
           <div
             style={{
               background: COLORS.raised,
