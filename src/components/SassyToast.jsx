@@ -17,7 +17,7 @@ const MOOD_ACCENT = {
 
 // Mimics a push notification card: bot avatar + title + body, auto-dismisses.
 // This is the "duolingo-style" in-app notification for when you land back
-// on the page after being gone — separate from the always-there MoodBot.
+// on the page after being gone — separate from the always-there SassyBot.
 export default function SassyToast({ title, body, mood = "sassy", onDismiss, duration = 6000 }) {
   const [show, setShow] = useState(false);
   const accent = MOOD_ACCENT[mood] || MOOD_ACCENT.sassy;

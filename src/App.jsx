@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import Dashboard from "./components/Dashboard";
-import MoodBot from "./components/MoodBot";
+import SassyBot from "./components/SassyBot";
 import SassyToast from "./components/SassyToast";
 import { useMoodState } from "./lib/useMoodState";
+import { useSassyBotSentiment } from "./lib/useSassyBotSentiment";
 import {
   requestNotificationPermission,
   registerServiceWorker,
@@ -12,6 +13,7 @@ import { PUSH_NOTIFICATIONS } from "./lib/sassyLines";
 
 export default function App() {
   const moodState = useMoodState(); // { mood, gapHours, streak, justReturned } or null on first tick
+  const { sentiment, handleAutoSassy } = useSassyBotSentiment(moodState);
   const [toast, setToast] = useState(null);
   const [permission, setPermission] = useState(
     typeof Notification !== "undefined" ? Notification.permission : "unsupported"
@@ -45,7 +47,17 @@ export default function App() {
 
   return (
     <div style={{ position: "relative" }}>
-      {moodState && <MoodBot mood={moodState.mood} streak={moodState.streak} />}
+      <div
+        style={{
+          position: "fixed",
+          top: "18px",
+          left: "50%",
+          transform: "translateX(-50%)",
+          zIndex: 200,
+        }}
+      >
+        <SassyBot sentiment={sentiment} onAutoSassy={handleAutoSassy} />
+      </div>
 
       {toast && (
         <SassyToast
