@@ -49,17 +49,16 @@ function buildDriverSource({ language, entryPoint, testCases }, userCode) {
 }
 
 /**
- * Owns real code-execution state for a lesson's test cases (language-
- * agnostic), and a `lastRunSummary` that flips to a fresh object each time
- * a run completes (pass/fail/total) — the signal App.jsx watches to drive
+ * Owns real code-execution state, shared across whichever lesson is
+ * currently active. `lastRunSummary` flips to a fresh object each time a
+ * run completes (pass/fail/total) — the signal App.jsx watches to drive
  * useSassyBotSentiment's thinking/cheer/annoyed/angry reactions.
  *
- * `runTests(userCode, { language, entryPoint })` takes the language-specific
- * bits per call rather than at hook-creation time, since which language is
- * active can change (a lesson may offer more than one) without needing a
- * new hook instance.
+ * `runTests(userCode, { language, entryPoint, testCases })` takes every
+ * lesson-specific bit per call rather than at hook-creation time, since
+ * more than one lesson can be active over the life of the app.
  */
-export function useCodeExecution(testCases) {
+export function useCodeExecution() {
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState(null);
   const [lastRunSummary, setLastRunSummary] = useState(null);
@@ -68,58 +67,57 @@ export function useCodeExecution(testCases) {
   const [error, setError] = useState(null);
   const runIdRef = useRef(0);
 
-  const runTests = useCallback(
-    async (userCode, { language, entryPoint }) => {
-      const runId = ++runIdRef.current;
-      setIsLoading(true);
-      setError(null);
-      setLastRunSummary(null);
+  const runTests = useCallback(async (userCode, { language, entryPoint, testCases }) => {
+    const runId = ++runIdRef.current;
+    setIsLoading(true);
+    setError(null);
+    setLastRunSummary(null);
 
-      const total = testCases.length;
-      const failAll = (message) => {
-        if (runId !== runIdRef.current) return; // superseded by a newer run
-        setError(message);
-        setResults(null);
-        setLastRunSummary({ passed: 0, failed: total, total });
-      };
+    const total = testCases.length;
+    const failAll = (message) => {
+      if (runId !== runIdRef.current) return; // superseded by a newer run
+      setError(message);
+      setResults(null);
+      setLastRunSummary({ passed: 0, failed: total, total });
+    };
 
-      try {
-        const source = buildDriverSource({ language, entryPoint, testCases }, userCode);
-        const { stdout, stderr, wallTimeMs, memoryBytes: mem } = await executeCode({
-          language,
-          source,
-        });
-        if (runId !== runIdRef.current) return;
+    try {
+      const source = buildDriverSource({ language, entryPoint, testCases }, userCode);
+      const { stdout, stderr, wallTimeMs, memoryBytes: mem } = await executeCode({
+        language,
+        source,
+      });
+      if (runId !== runIdRef.current) return;
 
-        const markerLine = stdout.split("\n").find((line) => line.startsWith(RESULT_MARKER));
-        if (!markerLine) {
-          failAll(stderr || "No output — check for a syntax error in your code.");
-          return;
-        }
-
-        const parsed = JSON.parse(markerLine.slice(RESULT_MARKER.length));
-        setResults(parsed);
-        setRuntimeMs(wallTimeMs);
-        setMemoryBytes(mem);
-        const passed = parsed.filter((r) => r.passed).length;
-        setLastRunSummary({ passed, failed: parsed.length - passed, total: parsed.length });
-      } catch (err) {
-        failAll(err.message || "Execution failed.");
-      } finally {
-        if (runId === runIdRef.current) setIsLoading(false);
+      const markerLine = stdout.split("\n").find((line) => line.startsWith(RESULT_MARKER));
+      if (!markerLine) {
+        failAll(stderr || "No output — check for a syntax error in your code.");
+        return;
       }
-    },
-    [testCases]
-  );
 
-  return {
-    isLoading,
-    results,
-    lastRunSummary,
-    runtimeMs,
-    memoryBytes,
-    error,
-    runTests,
-    testCount: testCases.length,
-  };
+      const parsed = JSON.parse(markerLine.slice(RESULT_MARKER.length));
+      setResults(parsed);
+      setRuntimeMs(wallTimeMs);
+      setMemoryBytes(mem);
+      const passed = parsed.filter((r) => r.passed).length;
+      setLastRunSummary({ passed, failed: parsed.length - passed, total: parsed.length });
+    } catch (err) {
+      failAll(err.message || "Execution failed.");
+    } finally {
+      if (runId === runIdRef.current) setIsLoading(false);
+    }
+  }, []);
+
+  /** Clears run state — call when switching to a different lesson so its output panel doesn't show the last lesson's results. */
+  const reset = useCallback(() => {
+    runIdRef.current++; // invalidate any in-flight run
+    setIsLoading(false);
+    setResults(null);
+    setLastRunSummary(null);
+    setRuntimeMs(null);
+    setMemoryBytes(null);
+    setError(null);
+  }, []);
+
+  return { isLoading, results, lastRunSummary, runtimeMs, memoryBytes, error, runTests, reset };
 }

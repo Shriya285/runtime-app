@@ -7,7 +7,7 @@ import StruggleTimer from "./StruggleTimer";
 import CompletionPrompt from "./CompletionPrompt";
 import DueForReview from "./DueForReview";
 import WeeklyReportModal from "./WeeklyReportModal";
-import { CURRENT_LESSON, LESSONS } from "../lib/lessons";
+import { CURRENT_LESSON, LESSON_SLIDING_WINDOW, LESSONS } from "../lib/lessons";
 import { useCodeExecutionContext } from "../lib/CodeExecutionContext";
 import { recordCompletion, getReviewRecord } from "../lib/spacedRepetition";
 import { logCompletion, getThisWeekCompletions } from "../lib/completionHistory";
@@ -65,12 +65,18 @@ function languageStorageKey(lessonId) {
   return `runtime_language_${lessonId}`;
 }
 
+const ACTIVE_LESSON_KEY = "runtime_active_lesson";
+
 export default function Dashboard({ onSolutionRevealedEarly, streak = 0 }) {
-  const lesson = CURRENT_LESSON;
-  const availableLanguages = Object.keys(lesson.languages);
   const execution = useCodeExecutionContext();
-  const typedTitle = useTypedText(lesson.title, 55, 300);
   const [showReport, setShowReport] = useState(false);
+
+  const [activeLessonId, setActiveLessonId] = useState(
+    () => localStorage.getItem(ACTIVE_LESSON_KEY) || LESSONS[0].id
+  );
+  const lesson = LESSONS.find((l) => l.id === activeLessonId) || LESSONS[0];
+  const availableLanguages = Object.keys(lesson.languages);
+  const typedTitle = useTypedText(lesson.title, 55, 300);
 
   const [language, setLanguage] = useState(
     () => localStorage.getItem(languageStorageKey(lesson.id)) || lesson.defaultLanguage
@@ -100,6 +106,26 @@ export default function Dashboard({ onSolutionRevealedEarly, streak = 0 }) {
     setSolutionRevealed(false);
   };
 
+  // Switching lessons reloads that lesson's own saved language/code and
+  // clears transient per-lesson UI state, including the previous lesson's
+  // run output — otherwise a stale "3/3 passed" could sit on screen for
+  // code that hasn't been run yet in the new lesson.
+  const handleSelectLesson = (lessonId) => {
+    if (lessonId === activeLessonId) return;
+    localStorage.setItem(ACTIVE_LESSON_KEY, lessonId);
+    setActiveLessonId(lessonId);
+    const nextLesson = LESSONS.find((l) => l.id === lessonId);
+    const nextLanguage = localStorage.getItem(languageStorageKey(lessonId)) || nextLesson.defaultLanguage;
+    setLanguage(nextLanguage);
+    setCode(
+      localStorage.getItem(codeStorageKey(lessonId, nextLanguage)) || nextLesson.languages[nextLanguage].starterCode
+    );
+    setSolutionRevealed(false);
+    setCompletion(null);
+    setPromptDismissed(false);
+    execution.reset();
+  };
+
   // Offer the trigger/core-idea prompt whenever a run comes back all-passed.
   useEffect(() => {
     if (!execution.lastRunSummary) return;
@@ -112,7 +138,7 @@ export default function Dashboard({ onSolutionRevealedEarly, streak = 0 }) {
 
   const handleRun = () => {
     recordActivityToday();
-    execution.runTests(code, { language, entryPoint: variant.entryPoint });
+    execution.runTests(code, { language, entryPoint: variant.entryPoint, testCases: lesson.testCases });
   };
 
   const handleReveal = (wasEarly) => {
@@ -138,17 +164,23 @@ export default function Dashboard({ onSolutionRevealedEarly, streak = 0 }) {
     setReviewRefreshKey((k) => k + 1);
   };
 
-  // Derived from real data rather than hardcoded: skill-path progression
-  // only goes as far as CURRENT_LESSON does, since it's the only lesson
-  // with real content behind it — "Sliding Window" unlocking visually
-  // doesn't mean there's a lesson to open yet.
-  const lessonCompleted = !!getReviewRecord(lesson.id);
+  // Derived from real completion data: a node is done once its lesson has
+  // a review record, active once the lesson before it is done (so it's
+  // actually reachable), and locked otherwise. Only two nodes have real
+  // lessons behind them — Binary Search / Trees & Recursion stay locked
+  // since there's nothing to open there yet.
+  const twoPointersDone = !!getReviewRecord(CURRENT_LESSON.id);
+  const slidingWindowDone = !!getReviewRecord(LESSON_SLIDING_WINDOW.id);
   const skillPath = [
-    { name: "Arrays & Strings", state: "done" },
-    { name: "Two Pointers", state: lessonCompleted ? "done" : "active" },
-    { name: "Sliding Window", state: lessonCompleted ? "active" : "locked" },
-    { name: "Binary Search", state: "locked" },
-    { name: "Trees & Recursion", state: "locked" },
+    { name: "Arrays & Strings", lessonId: null, state: "done" },
+    { name: "Two Pointers", lessonId: CURRENT_LESSON.id, state: twoPointersDone ? "done" : "active" },
+    {
+      name: "Sliding Window",
+      lessonId: LESSON_SLIDING_WINDOW.id,
+      state: slidingWindowDone ? "done" : twoPointersDone ? "active" : "locked",
+    },
+    { name: "Binary Search", lessonId: null, state: "locked" },
+    { name: "Trees & Recursion", lessonId: null, state: "locked" },
   ];
 
   const { daysThisWeek } = getWeekProgress();
@@ -320,12 +352,26 @@ export default function Dashboard({ onSolutionRevealedEarly, streak = 0 }) {
             {skillPath.map((node) => {
               const isDone = node.state === "done";
               const isActive = node.state === "active";
+              const isLocked = node.state === "locked";
+              const isCurrent = node.lessonId === lesson.id;
+              const clickable = Boolean(node.lessonId) && !isLocked;
               const dotColor = isDone ? COLORS.green : isActive ? COLORS.blue : COLORS.comment;
               return (
                 <div
                   key={node.name}
                   className="node-row"
-                  style={{ position: "relative", display: "flex", alignItems: "center", gap: "16px", padding: "13px 0" }}
+                  onClick={clickable ? () => handleSelectLesson(node.lessonId) : undefined}
+                  style={{
+                    position: "relative",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "16px",
+                    padding: "13px 10px",
+                    marginLeft: "-10px",
+                    borderRadius: "8px",
+                    background: isCurrent ? COLORS.raised : "transparent",
+                    cursor: clickable ? "pointer" : "default",
+                  }}
                 >
                   <div
                     style={{
@@ -353,7 +399,7 @@ export default function Dashboard({ onSolutionRevealedEarly, streak = 0 }) {
                       fontFamily: FONTS.mono,
                       fontSize: "13px",
                       color: isActive ? COLORS.fg : isDone ? COLORS.fgDim : COLORS.comment,
-                      fontWeight: isActive ? 600 : 400,
+                      fontWeight: isActive || isCurrent ? 600 : 400,
                     }}
                   >
                     {node.name}
@@ -584,8 +630,19 @@ export default function Dashboard({ onSolutionRevealedEarly, streak = 0 }) {
               Next milestone
             </div>
             <div style={{ fontFamily: FONTS.body, fontSize: "13.5px", color: COLORS.fg, lineHeight: 1.5 }}>
-              Finish <span style={{ color: COLORS.violet }}>Two Pointers</span> to unlock{" "}
-              <span style={{ color: COLORS.cyan }}>Sliding Window</span>
+              {!twoPointersDone ? (
+                <>
+                  Finish <span style={{ color: COLORS.violet }}>Two Pointers</span> to unlock{" "}
+                  <span style={{ color: COLORS.cyan }}>Sliding Window</span>
+                </>
+              ) : !slidingWindowDone ? (
+                <>
+                  Finish <span style={{ color: COLORS.violet }}>Sliding Window</span> — next pattern isn&rsquo;t
+                  built yet
+                </>
+              ) : (
+                <>Every available lesson is done — nice work.</>
+              )}
             </div>
           </div>
         </div>

@@ -7,7 +7,6 @@ import { useMoodState } from "./lib/useMoodState";
 import { useSassyBotSentiment } from "./lib/useSassyBotSentiment";
 import { useCodeExecution } from "./lib/useCodeExecution";
 import { CodeExecutionContext } from "./lib/CodeExecutionContext";
-import { CURRENT_LESSON } from "./lib/lessons";
 import {
   requestNotificationPermission,
   registerServiceWorker,
@@ -17,7 +16,7 @@ import { PUSH_NOTIFICATIONS } from "./lib/sassyLines";
 
 export default function App() {
   const moodState = useMoodState(); // { mood, gapHours, streak, justReturned } or null on first tick
-  const execution = useCodeExecution(CURRENT_LESSON.testCases);
+  const execution = useCodeExecution();
   const { sentiment, reportRunResult, reportSolutionRevealedEarly, handleAutoSassy } = useSassyBotSentiment(
     moodState,
     { isExecuting: execution.isLoading }

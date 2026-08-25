@@ -69,4 +69,61 @@ def two_sum(nums, target):
   },
 };
 
-export const LESSONS = [CURRENT_LESSON];
+export const LESSON_SLIDING_WINDOW = {
+  id: "sliding-window-max-sum",
+  lessonNumber: 8,
+  title: "Sliding Window",
+  prompt:
+    "Given an array of integers and a window size k, find the maximum sum of any contiguous subarray of size k.",
+  testCases: [
+    { args: [[2, 1, 5, 1, 3, 2], 3], expected: 9, describe: "[2,1,5,1,3,2], k=3" },
+    { args: [[2, 3, 4, 1, 5], 2], expected: 7, describe: "[2,3,4,1,5], k=2" },
+    { args: [[1, 1, 1, 1, 1], 4], expected: 4, describe: "[1,1,1,1,1], k=4" },
+  ],
+  defaultLanguage: "javascript",
+  languages: {
+    javascript: {
+      label: "JavaScript",
+      filename: "sliding-window.js",
+      entryPoint: "maxSubarraySum",
+      starterCode: `// fixed-size sliding window
+function maxSubarraySum(nums, k) {
+  // your code here
+}
+`,
+      solutionCode: `// fixed-size sliding window
+function maxSubarraySum(nums, k) {
+  let windowSum = 0;
+  for (let i = 0; i < k; i++) windowSum += nums[i];
+  let maxSum = windowSum;
+  for (let i = k; i < nums.length; i++) {
+    windowSum += nums[i] - nums[i - k];
+    maxSum = Math.max(maxSum, windowSum);
+  }
+  return maxSum;
+}
+`,
+    },
+    python: {
+      label: "Python",
+      filename: "sliding_window.py",
+      entryPoint: "max_subarray_sum",
+      starterCode: `# fixed-size sliding window
+def max_subarray_sum(nums, k):
+    # your code here
+    pass
+`,
+      solutionCode: `# fixed-size sliding window
+def max_subarray_sum(nums, k):
+    window_sum = sum(nums[:k])
+    max_sum = window_sum
+    for i in range(k, len(nums)):
+        window_sum += nums[i] - nums[i - k]
+        max_sum = max(max_sum, window_sum)
+    return max_sum
+`,
+    },
+  },
+};
+
+export const LESSONS = [CURRENT_LESSON, LESSON_SLIDING_WINDOW];
