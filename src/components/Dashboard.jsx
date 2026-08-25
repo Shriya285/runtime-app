@@ -6,9 +6,12 @@ import AvatarInitials from "./AvatarInitials";
 import StruggleTimer from "./StruggleTimer";
 import CompletionPrompt from "./CompletionPrompt";
 import DueForReview from "./DueForReview";
+import WeeklyReportModal from "./WeeklyReportModal";
 import { CURRENT_LESSON, LESSONS } from "../lib/lessons";
 import { useCodeExecutionContext } from "../lib/CodeExecutionContext";
-import { recordCompletion } from "../lib/spacedRepetition";
+import { recordCompletion, getReviewRecord } from "../lib/spacedRepetition";
+import { logCompletion, getThisWeekCompletions } from "../lib/completionHistory";
+import { recordActivityToday, getWeekProgress } from "../lib/weeklyActivity";
 
 const COLORS = {
   bg: "#1A1B26",
@@ -54,14 +57,6 @@ function useTypedText(text, speed = 28, startDelay = 0) {
   return out;
 }
 
-const skillPath = [
-  { name: "Arrays & Strings", state: "done" },
-  { name: "Two Pointers", state: "active" },
-  { name: "Sliding Window", state: "locked" },
-  { name: "Binary Search", state: "locked" },
-  { name: "Trees & Recursion", state: "locked" },
-];
-
 function codeStorageKey(lessonId, language) {
   return `runtime_code_${lessonId}_${language}`;
 }
@@ -70,11 +65,12 @@ function languageStorageKey(lessonId) {
   return `runtime_language_${lessonId}`;
 }
 
-export default function Dashboard({ onSolutionRevealedEarly }) {
+export default function Dashboard({ onSolutionRevealedEarly, streak = 0 }) {
   const lesson = CURRENT_LESSON;
   const availableLanguages = Object.keys(lesson.languages);
   const execution = useCodeExecutionContext();
   const typedTitle = useTypedText(lesson.title, 55, 300);
+  const [showReport, setShowReport] = useState(false);
 
   const [language, setLanguage] = useState(
     () => localStorage.getItem(languageStorageKey(lesson.id)) || lesson.defaultLanguage
@@ -115,6 +111,7 @@ export default function Dashboard({ onSolutionRevealedEarly }) {
   }, [execution.lastRunSummary]);
 
   const handleRun = () => {
+    recordActivityToday();
     execution.runTests(code, { language, entryPoint: variant.entryPoint });
   };
 
@@ -127,10 +124,35 @@ export default function Dashboard({ onSolutionRevealedEarly }) {
   };
 
   const handleSaveCompletion = ({ trigger, coreIdea }) => {
-    recordCompletion(lesson.id, { trigger, coreIdea, reason: completion.reason });
+    recordCompletion(lesson.id, { trigger, coreIdea, reason: completion.reason, code, language });
+    logCompletion({
+      lessonId: lesson.id,
+      lessonTitle: lesson.title,
+      trigger,
+      coreIdea,
+      code,
+      language,
+      reason: completion.reason,
+    });
     setCompletion(null);
     setReviewRefreshKey((k) => k + 1);
   };
+
+  // Derived from real data rather than hardcoded: skill-path progression
+  // only goes as far as CURRENT_LESSON does, since it's the only lesson
+  // with real content behind it — "Sliding Window" unlocking visually
+  // doesn't mean there's a lesson to open yet.
+  const lessonCompleted = !!getReviewRecord(lesson.id);
+  const skillPath = [
+    { name: "Arrays & Strings", state: "done" },
+    { name: "Two Pointers", state: lessonCompleted ? "done" : "active" },
+    { name: "Sliding Window", state: lessonCompleted ? "active" : "locked" },
+    { name: "Binary Search", state: "locked" },
+    { name: "Trees & Recursion", state: "locked" },
+  ];
+
+  const { daysThisWeek } = getWeekProgress();
+  const thisWeekCompletions = getThisWeekCompletions();
 
   const outputState = execution.isLoading
     ? "loading"
@@ -254,7 +276,7 @@ export default function Dashboard({ onSolutionRevealedEarly }) {
             alignItems: "center",
           }}
         >
-          <span style={{ color: COLORS.orange }}>&#9679; 14 day streak</span>
+          <span style={{ color: COLORS.orange }}>&#9679; {streak} day streak</span>
           <span>1,240 XP</span>
           <AvatarInitials />
         </div>
@@ -529,8 +551,26 @@ export default function Dashboard({ onSolutionRevealedEarly }) {
               This week
             </div>
             <div style={{ fontFamily: FONTS.display, fontSize: "30px", fontWeight: 600, color: COLORS.orange }}>
-              5<span style={{ fontSize: "16px", color: COLORS.fgDim, fontFamily: FONTS.body }}>/7 days</span>
+              {daysThisWeek}
+              <span style={{ fontSize: "16px", color: COLORS.fgDim, fontFamily: FONTS.body }}>/7 days</span>
             </div>
+            <button
+              onClick={() => setShowReport(true)}
+              style={{
+                marginTop: "12px",
+                background: "transparent",
+                border: `1px solid ${COLORS.border}`,
+                borderRadius: "6px",
+                padding: "6px 10px",
+                fontFamily: FONTS.mono,
+                fontSize: "11px",
+                color: COLORS.blue,
+                cursor: "pointer",
+                width: "100%",
+              }}
+            >
+              View weekly report
+            </button>
           </div>
           <div
             style={{
@@ -550,6 +590,10 @@ export default function Dashboard({ onSolutionRevealedEarly }) {
           </div>
         </div>
       </div>
+
+      {showReport && (
+        <WeeklyReportModal completions={thisWeekCompletions} onClose={() => setShowReport(false)} />
+      )}
     </div>
   );
 }

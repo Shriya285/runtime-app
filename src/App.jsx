@@ -133,7 +133,7 @@ export default function App() {
       </div>
 
       <CodeExecutionContext.Provider value={execution}>
-        <Dashboard onSolutionRevealedEarly={reportSolutionRevealedEarly} />
+        <Dashboard onSolutionRevealedEarly={reportSolutionRevealedEarly} streak={moodState ? moodState.streak : 0} />
       </CodeExecutionContext.Provider>
     </div>
   );

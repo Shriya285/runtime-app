@@ -22,13 +22,15 @@ export function getReviewRecord(lessonId) {
 }
 
 /** Called the first time a problem is completed — tests passed, or solution revealed. */
-export function recordCompletion(lessonId, { trigger, coreIdea, reason }) {
+export function recordCompletion(lessonId, { trigger, coreIdea, reason, code, language }) {
   const now = new Date();
   const record = {
     lessonId,
     trigger,
     coreIdea,
     reason, // 'tests-passed' | 'solution-revealed'
+    code,
+    language,
     firstCompletedAt: now.toISOString(),
     stage: 0,
     nextDueAt: addDays(now, SCHEDULE_DAYS[0]).toISOString(),
