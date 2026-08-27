@@ -9,8 +9,43 @@ const RESULT_MARKER = "__RUNTIME_RESULTS__";
 // is passed through as a JSON string (parsed with JSON.parse/json.loads at
 // runtime) rather than interpolated as source-language literals, so it
 // works the same regardless of target language.
-function buildDriverSource({ language, entryPoint, testCases }, userCode) {
+//
+// Two testKinds:
+//  - "args" (default): hand-built lessons. testCases are {args, expected}
+//    objects; the entry point is a plain top-level function.
+//  - "assertions": ingested LeetCode-dataset problems (src/data/problems.json).
+//    Solutions are `class Solution:` methods, and testCases are raw
+//    `candidate(kw=val, ...) == expected` expression strings straight from
+//    the dataset's own check() function — eval'd directly rather than
+//    reparsed into positional args, since LeetCode's kwarg-style calls with
+//    nested-bracket values aren't safe to split on commas by hand. Needs
+//    pythonPrelude (the dataset's ListNode/TreeNode/list_node/tree_node
+//    helpers) since some assertions reference them.
+function buildDriverSource({ language, entryPoint, testCases, testKind = "args", pythonPrelude }, userCode) {
   const testsJson = JSON.stringify(testCases);
+
+  if (language === "python" && testKind === "assertions") {
+    return [
+      pythonPrelude,
+      "",
+      userCode,
+      "",
+      "import json",
+      `candidate = Solution().${entryPoint}`,
+      `__ASSERTIONS__ = json.loads(r'''${testsJson}''')`,
+      "__results__ = []",
+      "for __expr in __ASSERTIONS__:",
+      "    try:",
+      "        assert eval(__expr)",
+      '        __results__.append({"passed": True, "error": None})',
+      "    except AssertionError:",
+      '        __results__.append({"passed": False, "error": "assertion failed"})',
+      "    except Exception as __e:",
+      '        __results__.append({"passed": False, "error": str(__e)})',
+      `print(${JSON.stringify(RESULT_MARKER)} + json.dumps(__results__))`,
+      "",
+    ].join("\n");
+  }
 
   if (language === "python") {
     return [
@@ -67,7 +102,7 @@ export function useCodeExecution() {
   const [error, setError] = useState(null);
   const runIdRef = useRef(0);
 
-  const runTests = useCallback(async (userCode, { language, entryPoint, testCases }) => {
+  const runTests = useCallback(async (userCode, { language, entryPoint, testCases, testKind, pythonPrelude }) => {
     const runId = ++runIdRef.current;
     setIsLoading(true);
     setError(null);
@@ -82,7 +117,7 @@ export function useCodeExecution() {
     };
 
     try {
-      const source = buildDriverSource({ language, entryPoint, testCases }, userCode);
+      const source = buildDriverSource({ language, entryPoint, testCases, testKind, pythonPrelude }, userCode);
       const { stdout, stderr, wallTimeMs, memoryBytes: mem } = await executeCode({
         language,
         source,
