@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import CodeEditor from "./CodeEditor";
 import OutputPanel from "./OutputPanel";
 import LeetCodeLinkField from "./LeetCodeLinkField";
@@ -7,11 +7,16 @@ import StruggleTimer from "./StruggleTimer";
 import CompletionPrompt from "./CompletionPrompt";
 import DueForReview from "./DueForReview";
 import WeeklyReportModal from "./WeeklyReportModal";
+import TodaysPlanPanel from "./TodaysPlanPanel";
+import MockOASession from "./MockOASession";
 import { CURRENT_LESSON, LESSON_SLIDING_WINDOW, LESSONS } from "../lib/lessons";
 import { useCodeExecutionContext } from "../lib/CodeExecutionContext";
 import { recordCompletion, getReviewRecord } from "../lib/spacedRepetition";
 import { logCompletion, getThisWeekCompletions } from "../lib/completionHistory";
 import { recordActivityToday, getWeekProgress } from "../lib/weeklyActivity";
+import { loadProblems } from "../lib/problemsData";
+import { problemToLessonShape } from "../lib/problemAdapter";
+import { getCurrentDayPlan, isBlockComplete, advanceDay, startNextBlock } from "../lib/studyPlan";
 
 const COLORS = {
   bg: "#1A1B26",
@@ -71,17 +76,36 @@ export default function Dashboard({ onSolutionRevealedEarly, streak = 0 }) {
   const execution = useCodeExecutionContext();
   const [showReport, setShowReport] = useState(false);
 
+  // --- Study plan state ---
+  const [studyProblems, setStudyProblems] = useState(null);
+  const [planRefreshKey, setPlanRefreshKey] = useState(0);
+  const [activePlanProblem, setActivePlanProblem] = useState(null); // dataset problem object, or null (freeplay)
+  const [mockOAActive, setMockOAActive] = useState(false);
+
+  useEffect(() => {
+    loadProblems().then(setStudyProblems);
+  }, []);
+
+  // getCurrentDayPlan does a localStorage read/write (assignment caching),
+  // so this is memoized rather than called on every render — Dashboard
+  // re-renders on every keystroke in the editor.
+  const planDay = useMemo(() => (studyProblems ? getCurrentDayPlan(studyProblems) : null), [studyProblems, planRefreshKey]);
+  const blockComplete = useMemo(() => isBlockComplete(), [planRefreshKey]);
+
   const [activeLessonId, setActiveLessonId] = useState(
     () => localStorage.getItem(ACTIVE_LESSON_KEY) || LESSONS[0].id
   );
-  const lesson = LESSONS.find((l) => l.id === activeLessonId) || LESSONS[0];
+
+  const lesson = activePlanProblem
+    ? problemToLessonShape(activePlanProblem)
+    : LESSONS.find((l) => l.id === activeLessonId) || LESSONS[0];
   const availableLanguages = Object.keys(lesson.languages);
   const typedTitle = useTypedText(lesson.title, 55, 300);
 
   const [language, setLanguage] = useState(
     () => localStorage.getItem(languageStorageKey(lesson.id)) || lesson.defaultLanguage
   );
-  const variant = lesson.languages[language];
+  const variant = lesson.languages[language] || lesson.languages[lesson.defaultLanguage];
 
   const [code, setCode] = useState(
     () => localStorage.getItem(codeStorageKey(lesson.id, language)) || variant.starterCode
@@ -106,24 +130,35 @@ export default function Dashboard({ onSolutionRevealedEarly, streak = 0 }) {
     setSolutionRevealed(false);
   };
 
-  // Switching lessons reloads that lesson's own saved language/code and
-  // clears transient per-lesson UI state, including the previous lesson's
-  // run output — otherwise a stale "3/3 passed" could sit on screen for
-  // code that hasn't been run yet in the new lesson.
-  const handleSelectLesson = (lessonId) => {
-    if (lessonId === activeLessonId) return;
-    localStorage.setItem(ACTIVE_LESSON_KEY, lessonId);
-    setActiveLessonId(lessonId);
-    const nextLesson = LESSONS.find((l) => l.id === lessonId);
-    const nextLanguage = localStorage.getItem(languageStorageKey(lessonId)) || nextLesson.defaultLanguage;
+  // Switching lessons (hand-built or plan-sourced) reloads that lesson's
+  // own saved language/code and clears transient per-lesson UI state,
+  // including the previous lesson's run output — otherwise a stale
+  // "3/3 passed" could sit on screen for code that hasn't been run yet.
+  const resetTransientState = (nextLessonId, nextDefaultLanguage, languagesMap) => {
+    const nextLanguage = localStorage.getItem(languageStorageKey(nextLessonId)) || nextDefaultLanguage;
     setLanguage(nextLanguage);
-    setCode(
-      localStorage.getItem(codeStorageKey(lessonId, nextLanguage)) || nextLesson.languages[nextLanguage].starterCode
-    );
+    setCode(localStorage.getItem(codeStorageKey(nextLessonId, nextLanguage)) || languagesMap[nextLanguage].starterCode);
     setSolutionRevealed(false);
     setCompletion(null);
     setPromptDismissed(false);
     execution.reset();
+  };
+
+  const handleSelectLesson = (lessonId) => {
+    const alreadyThere = !activePlanProblem && lessonId === activeLessonId;
+    setActivePlanProblem(null);
+    if (alreadyThere) return;
+    localStorage.setItem(ACTIVE_LESSON_KEY, lessonId);
+    setActiveLessonId(lessonId);
+    const nextLesson = LESSONS.find((l) => l.id === lessonId);
+    resetTransientState(lessonId, nextLesson.defaultLanguage, nextLesson.languages);
+  };
+
+  const handleOpenPlanProblem = (problem) => {
+    if (activePlanProblem && activePlanProblem.id === problem.id) return;
+    setActivePlanProblem(problem);
+    const shaped = problemToLessonShape(problem);
+    resetTransientState(shaped.id, shaped.defaultLanguage, shaped.languages);
   };
 
   // Offer the trigger/core-idea prompt whenever a run comes back all-passed.
@@ -138,7 +173,13 @@ export default function Dashboard({ onSolutionRevealedEarly, streak = 0 }) {
 
   const handleRun = () => {
     recordActivityToday();
-    execution.runTests(code, { language, entryPoint: variant.entryPoint, testCases: lesson.testCases });
+    execution.runTests(code, {
+      language,
+      entryPoint: variant.entryPoint,
+      testCases: lesson.testCases,
+      testKind: lesson.testKind,
+      pythonPrelude: lesson.pythonPrelude,
+    });
   };
 
   const handleReveal = (wasEarly) => {
@@ -150,7 +191,7 @@ export default function Dashboard({ onSolutionRevealedEarly, streak = 0 }) {
   };
 
   const handleSaveCompletion = ({ trigger, coreIdea }) => {
-    recordCompletion(lesson.id, { trigger, coreIdea, reason: completion.reason, code, language });
+    recordCompletion(lesson.id, { trigger, coreIdea, reason: completion.reason, code, language, mode: "lesson" });
     logCompletion({
       lessonId: lesson.id,
       lessonTitle: lesson.title,
@@ -159,16 +200,59 @@ export default function Dashboard({ onSolutionRevealedEarly, streak = 0 }) {
       code,
       language,
       reason: completion.reason,
+      mode: "lesson",
     });
     setCompletion(null);
+    setReviewRefreshKey((k) => k + 1);
+    setPlanRefreshKey((k) => k + 1);
+  };
+
+  const handleAdvanceDay = () => {
+    advanceDay();
+    setActivePlanProblem(null);
+    setPlanRefreshKey((k) => k + 1);
+  };
+
+  const handleStartNextBlock = () => {
+    startNextBlock();
+    setActivePlanProblem(null);
+    setPlanRefreshKey((k) => k + 1);
+  };
+
+  const handleMockOAFinish = (collected) => {
+    for (const item of collected) {
+      const lessonId = `dataset-${item.problem.id}`;
+      recordCompletion(lessonId, {
+        trigger: item.trigger,
+        coreIdea: item.coreIdea,
+        reason: item.reason,
+        code: item.code,
+        language: item.language,
+        mode: "mockOA",
+      });
+      logCompletion({
+        lessonId,
+        lessonTitle: item.problem.title,
+        trigger: item.trigger,
+        coreIdea: item.coreIdea,
+        code: item.code,
+        language: item.language,
+        reason: item.reason,
+        mode: "mockOA",
+      });
+    }
+    setMockOAActive(false);
+    advanceDay();
+    setPlanRefreshKey((k) => k + 1);
     setReviewRefreshKey((k) => k + 1);
   };
 
   // Derived from real completion data: a node is done once its lesson has
   // a review record, active once the lesson before it is done (so it's
   // actually reachable), and locked otherwise. Only two nodes have real
-  // lessons behind them — Binary Search / Trees & Recursion stay locked
-  // since there's nothing to open there yet.
+  // hand-built lessons behind them — Binary Search / Trees & Recursion
+  // stay locked here (the study plan, not this skill path, is what
+  // actually covers those patterns now via ingested problems).
   const twoPointersDone = !!getReviewRecord(CURRENT_LESSON.id);
   const slidingWindowDone = !!getReviewRecord(LESSON_SLIDING_WINDOW.id);
   const skillPath = [
@@ -186,6 +270,22 @@ export default function Dashboard({ onSolutionRevealedEarly, streak = 0 }) {
   const { daysThisWeek } = getWeekProgress();
   const thisWeekCompletions = getThisWeekCompletions();
 
+  // Combined id list so the review-day panel can surface due reviews from
+  // both the hand-built lessons and any ingested study-plan problem.
+  const reviewLessons = useMemo(() => {
+    const dataset = (studyProblems || []).map(problemToLessonShape);
+    return [...LESSONS, ...dataset];
+  }, [studyProblems]);
+
+  const completedPlanProblemIds = useMemo(() => {
+    if (!planDay) return new Set();
+    const ids = new Set();
+    for (const p of planDay.assignedProblems) {
+      if (getReviewRecord(`dataset-${p.id}`)) ids.add(p.id);
+    }
+    return ids;
+  }, [planDay, reviewRefreshKey]);
+
   const outputState = execution.isLoading
     ? "loading"
     : execution.error
@@ -194,6 +294,8 @@ export default function Dashboard({ onSolutionRevealedEarly, streak = 0 }) {
     ? "results"
     : "idle";
   const allPassed = execution.results && execution.results.every((r) => r.passed);
+
+  const showingMockOA = mockOAActive && planDay && planDay.template.type === "mockOA";
 
   return (
     <div
@@ -410,191 +512,215 @@ export default function Dashboard({ onSolutionRevealedEarly, streak = 0 }) {
           </div>
         </div>
 
-        {/* Center: lesson terminal */}
+        {/* Center: today's plan + lesson terminal */}
         <div className="reveal" style={{ flex: 1, minWidth: 0, animationDelay: "0.16s" }}>
-          <div style={{ marginBottom: "18px" }}>
-            <div
-              style={{
-                fontFamily: FONTS.mono,
-                fontSize: "11px",
-                color: COLORS.blue,
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-                marginBottom: "6px",
-              }}
-            >
-              Lesson {String(lesson.lessonNumber).padStart(2, "0")}
-            </div>
-            <h1
-              style={{
-                fontFamily: FONTS.display,
-                fontWeight: 600,
-                fontSize: "34px",
-                margin: 0,
-                minHeight: "42px",
-              }}
-            >
-              {typedTitle}
-              <span className="cursor-blink" style={{ color: COLORS.orange }}>
-                &#9612;
-              </span>
-            </h1>
-          </div>
+          <TodaysPlanPanel
+            planDay={planDay}
+            blockComplete={blockComplete}
+            reviewLessons={reviewLessons}
+            reviewRefreshKey={reviewRefreshKey}
+            activeProblemId={activePlanProblem ? activePlanProblem.id : null}
+            completedIds={completedPlanProblemIds}
+            onOpenProblem={handleOpenPlanProblem}
+            onAdvanceDay={handleAdvanceDay}
+            onStartNextBlock={handleStartNextBlock}
+            onStartMockOA={() => setMockOAActive(true)}
+          />
 
-          {lesson.prompt && (
-            <div
-              style={{
-                fontFamily: FONTS.body,
-                fontSize: "14px",
-                color: COLORS.fgDim,
-                lineHeight: 1.6,
-                marginBottom: "18px",
-                paddingBottom: "18px",
-                borderBottom: `1px solid ${COLORS.border}`,
-              }}
-            >
-              {lesson.prompt}
-            </div>
-          )}
-
-          <div style={{ marginBottom: "14px" }}>
-            <StruggleTimer lessonId={lesson.id} onReveal={handleReveal} revealed={solutionRevealed} />
-          </div>
-
-          {/* Terminal chrome */}
-          <div
-            style={{
-              background: COLORS.bgDark,
-              border: `1px solid ${COLORS.border}`,
-              borderRadius: "12px",
-              overflow: "hidden",
-              boxShadow: "0 20px 60px -20px rgba(0,0,0,0.6)",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "12px 16px",
-                borderBottom: `1px solid ${COLORS.border}`,
-                background: COLORS.surface,
-              }}
-            >
-              <div style={{ display: "flex", gap: "6px" }}>
-                <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: COLORS.red }} />
-                <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: COLORS.yellow }} />
-                <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: COLORS.green }} />
+          {showingMockOA ? (
+            <MockOASession
+              problems={planDay.assignedProblems}
+              sessionKey={`${planDay.blockIndex}-${planDay.dayIndex}`}
+              onFinish={handleMockOAFinish}
+            />
+          ) : (
+            <>
+              <div style={{ marginBottom: "18px" }}>
+                <div
+                  style={{
+                    fontFamily: FONTS.mono,
+                    fontSize: "11px",
+                    color: COLORS.blue,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                    marginBottom: "6px",
+                  }}
+                >
+                  {lesson.lessonNumber ? `Lesson ${String(lesson.lessonNumber).padStart(2, "0")}` : lesson.pattern || "Practice"}
+                </div>
+                <h1
+                  style={{
+                    fontFamily: FONTS.display,
+                    fontWeight: 600,
+                    fontSize: "34px",
+                    margin: 0,
+                    minHeight: "42px",
+                  }}
+                >
+                  {typedTitle}
+                  <span className="cursor-blink" style={{ color: COLORS.orange }}>
+                    &#9612;
+                  </span>
+                </h1>
               </div>
-              <span style={{ fontFamily: FONTS.mono, fontSize: "12px", color: COLORS.fgDim, marginLeft: "6px" }}>
-                {variant.filename}
-              </span>
-              <div style={{ flex: 1 }} />
-              <div style={{ display: "flex", gap: "4px" }}>
-                {availableLanguages.map((lang) => (
-                  <button
-                    key={lang}
-                    onClick={() => handleLanguageChange(lang)}
-                    style={{
-                      background: lang === language ? COLORS.raised : "transparent",
-                      border: `1px solid ${lang === language ? COLORS.blue : COLORS.border}`,
-                      borderRadius: "6px",
-                      padding: "3px 9px",
-                      fontFamily: FONTS.mono,
-                      fontSize: "11px",
-                      color: lang === language ? COLORS.fg : COLORS.fgDim,
-                      cursor: "pointer",
-                    }}
-                  >
-                    {lesson.languages[lang].label}
-                  </button>
-                ))}
+
+              {lesson.prompt && (
+                <div
+                  style={{
+                    fontFamily: FONTS.body,
+                    fontSize: "14px",
+                    color: COLORS.fgDim,
+                    lineHeight: 1.6,
+                    marginBottom: "18px",
+                    paddingBottom: "18px",
+                    borderBottom: `1px solid ${COLORS.border}`,
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
+                  {lesson.prompt}
+                </div>
+              )}
+
+              <div style={{ marginBottom: "14px" }}>
+                <StruggleTimer lessonId={lesson.id} onReveal={handleReveal} revealed={solutionRevealed} />
               </div>
-            </div>
 
-            <CodeEditor value={code} onChange={setCode} height="280px" language={language} />
-
-            {/* Run bar */}
-            <div
-              style={{
-                borderTop: `1px solid ${COLORS.border}`,
-                padding: "14px 20px",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                background: COLORS.surface,
-              }}
-            >
-              <button
-                className="run-btn"
-                onClick={handleRun}
-                disabled={execution.isLoading}
+              {/* Terminal chrome */}
+              <div
                 style={{
-                  background: COLORS.green,
-                  color: COLORS.bgDark,
-                  border: "none",
-                  borderRadius: "8px",
-                  padding: "9px 18px",
-                  fontFamily: FONTS.mono,
-                  fontWeight: 600,
-                  fontSize: "13px",
-                  cursor: execution.isLoading ? "default" : "pointer",
-                  opacity: execution.isLoading ? 0.7 : 1,
-                  transition: "all 0.15s ease",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
+                  background: COLORS.bgDark,
+                  border: `1px solid ${COLORS.border}`,
+                  borderRadius: "12px",
+                  overflow: "hidden",
+                  boxShadow: "0 20px 60px -20px rgba(0,0,0,0.6)",
                 }}
               >
-                &#9654; Run tests
-              </button>
-              <span style={{ fontFamily: FONTS.mono, fontSize: "12px", color: COLORS.fgDim }}>
-                {lesson.testCases.length} test cases
-              </span>
-            </div>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    padding: "12px 16px",
+                    borderBottom: `1px solid ${COLORS.border}`,
+                    background: COLORS.surface,
+                  }}
+                >
+                  <div style={{ display: "flex", gap: "6px" }}>
+                    <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: COLORS.red }} />
+                    <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: COLORS.yellow }} />
+                    <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: COLORS.green }} />
+                  </div>
+                  <span style={{ fontFamily: FONTS.mono, fontSize: "12px", color: COLORS.fgDim, marginLeft: "6px" }}>
+                    {variant.filename}
+                  </span>
+                  <div style={{ flex: 1 }} />
+                  <div style={{ display: "flex", gap: "4px" }}>
+                    {availableLanguages.map((lang) => (
+                      <button
+                        key={lang}
+                        onClick={() => handleLanguageChange(lang)}
+                        style={{
+                          background: lang === language ? COLORS.raised : "transparent",
+                          border: `1px solid ${lang === language ? COLORS.blue : COLORS.border}`,
+                          borderRadius: "6px",
+                          padding: "3px 9px",
+                          fontFamily: FONTS.mono,
+                          fontSize: "11px",
+                          color: lang === language ? COLORS.fg : COLORS.fgDim,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {lesson.languages[lang].label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-            {/* Solved elsewhere */}
-            <div
-              style={{
-                borderTop: `1px solid ${COLORS.border}`,
-                padding: "12px 20px",
-                background: COLORS.surface,
-              }}
-            >
-              <LeetCodeLinkField lessonId={lesson.id} />
-            </div>
+                <CodeEditor value={code} onChange={setCode} height="280px" language={language} />
 
-            {/* Output panel */}
-            <div
-              style={{
-                borderTop: `1px solid ${COLORS.border}`,
-                padding: "16px 20px",
-                fontFamily: FONTS.mono,
-                fontSize: "12.5px",
-                minHeight: "76px",
-                animation: allPassed ? "successFlash 1.2s ease forwards" : "none",
-              }}
-            >
-              <OutputPanel
-                state={outputState}
-                error={execution.error}
-                results={execution.results}
-                runtimeMs={execution.runtimeMs}
-                memoryBytes={execution.memoryBytes}
-                testCount={lesson.testCases.length}
-              />
-            </div>
+                {/* Run bar */}
+                <div
+                  style={{
+                    borderTop: `1px solid ${COLORS.border}`,
+                    padding: "14px 20px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    background: COLORS.surface,
+                  }}
+                >
+                  <button
+                    className="run-btn"
+                    onClick={handleRun}
+                    disabled={execution.isLoading}
+                    style={{
+                      background: COLORS.green,
+                      color: COLORS.bgDark,
+                      border: "none",
+                      borderRadius: "8px",
+                      padding: "9px 18px",
+                      fontFamily: FONTS.mono,
+                      fontWeight: 600,
+                      fontSize: "13px",
+                      cursor: execution.isLoading ? "default" : "pointer",
+                      opacity: execution.isLoading ? 0.7 : 1,
+                      transition: "all 0.15s ease",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}
+                  >
+                    &#9654; Run tests
+                  </button>
+                  <span style={{ fontFamily: FONTS.mono, fontSize: "12px", color: COLORS.fgDim }}>
+                    {lesson.testCases.length} test cases
+                  </span>
+                </div>
 
-            {completion && !promptDismissed && (
-              <div style={{ padding: "0 20px 20px" }}>
-                <CompletionPrompt
-                  reason={completion.reason}
-                  onSave={handleSaveCompletion}
-                  onDismiss={() => setPromptDismissed(true)}
-                />
+                {/* Solved elsewhere */}
+                <div
+                  style={{
+                    borderTop: `1px solid ${COLORS.border}`,
+                    padding: "12px 20px",
+                    background: COLORS.surface,
+                  }}
+                >
+                  <LeetCodeLinkField lessonId={lesson.id} />
+                </div>
+
+                {/* Output panel */}
+                <div
+                  style={{
+                    borderTop: `1px solid ${COLORS.border}`,
+                    padding: "16px 20px",
+                    fontFamily: FONTS.mono,
+                    fontSize: "12.5px",
+                    minHeight: "76px",
+                    animation: allPassed ? "successFlash 1.2s ease forwards" : "none",
+                  }}
+                >
+                  <OutputPanel
+                    state={outputState}
+                    error={execution.error}
+                    results={execution.results}
+                    runtimeMs={execution.runtimeMs}
+                    memoryBytes={execution.memoryBytes}
+                    testCount={lesson.testCases.length}
+                  />
+                </div>
+
+                {completion && !promptDismissed && (
+                  <div style={{ padding: "0 20px 20px" }}>
+                    <CompletionPrompt
+                      reason={completion.reason}
+                      onSave={handleSaveCompletion}
+                      onDismiss={() => setPromptDismissed(true)}
+                    />
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </>
+          )}
         </div>
 
         {/* Right: stats */}
@@ -653,11 +779,11 @@ export default function Dashboard({ onSolutionRevealedEarly, streak = 0 }) {
                 </>
               ) : !slidingWindowDone ? (
                 <>
-                  Finish <span style={{ color: COLORS.violet }}>Sliding Window</span> — next pattern isn&rsquo;t
-                  built yet
+                  Finish <span style={{ color: COLORS.violet }}>Sliding Window</span> — the 15-day plan on the
+                  left covers what comes after
                 </>
               ) : (
-                <>Every available lesson is done — nice work.</>
+                <>Follow the 15-day plan above for what&rsquo;s next.</>
               )}
             </div>
           </div>

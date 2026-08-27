@@ -110,10 +110,12 @@ export function useCodeExecution() {
 
     const total = testCases.length;
     const failAll = (message) => {
-      if (runId !== runIdRef.current) return; // superseded by a newer run
+      const summary = { passed: 0, failed: total, total, error: message, results: null };
+      if (runId !== runIdRef.current) return summary; // superseded by a newer run
       setError(message);
       setResults(null);
-      setLastRunSummary({ passed: 0, failed: total, total });
+      setLastRunSummary(summary);
+      return summary;
     };
 
     try {
@@ -122,12 +124,11 @@ export function useCodeExecution() {
         language,
         source,
       });
-      if (runId !== runIdRef.current) return;
+      if (runId !== runIdRef.current) return { passed: 0, failed: total, total, error: "superseded", results: null };
 
       const markerLine = stdout.split("\n").find((line) => line.startsWith(RESULT_MARKER));
       if (!markerLine) {
-        failAll(stderr || "No output — check for a syntax error in your code.");
-        return;
+        return failAll(stderr || "No output — check for a syntax error in your code.");
       }
 
       const parsed = JSON.parse(markerLine.slice(RESULT_MARKER.length));
@@ -135,9 +136,11 @@ export function useCodeExecution() {
       setRuntimeMs(wallTimeMs);
       setMemoryBytes(mem);
       const passed = parsed.filter((r) => r.passed).length;
-      setLastRunSummary({ passed, failed: parsed.length - passed, total: parsed.length });
+      const summary = { passed, failed: parsed.length - passed, total: parsed.length, error: null, results: parsed };
+      setLastRunSummary(summary);
+      return summary;
     } catch (err) {
-      failAll(err.message || "Execution failed.");
+      return failAll(err.message || "Execution failed.");
     } finally {
       if (runId === runIdRef.current) setIsLoading(false);
     }

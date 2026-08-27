@@ -22,7 +22,7 @@ export function getReviewRecord(lessonId) {
 }
 
 /** Called the first time a problem is completed — tests passed, or solution revealed. */
-export function recordCompletion(lessonId, { trigger, coreIdea, reason, code, language }) {
+export function recordCompletion(lessonId, { trigger, coreIdea, reason, code, language, mode = "lesson" }) {
   const now = new Date();
   const record = {
     lessonId,
@@ -31,6 +31,7 @@ export function recordCompletion(lessonId, { trigger, coreIdea, reason, code, la
     reason, // 'tests-passed' | 'solution-revealed'
     code,
     language,
+    mode, // 'lesson' | 'mockOA' — same shape either way, no downstream special-casing
     firstCompletedAt: now.toISOString(),
     stage: 0,
     nextDueAt: addDays(now, SCHEDULE_DAYS[0]).toISOString(),
