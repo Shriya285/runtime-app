@@ -7,26 +7,29 @@
 
 export const BLOCK_LENGTH = 15;
 
-// Ordered list of patterns for blocks after the first (block 0's four —
-// Two Pointers, Sliding Window, Binary Search, Trees & Recursion — are
-// fixed and don't come from this list). Extend this (and re-run
-// scripts/ingest-problems.js with a matching PATTERN_RULES entry) when you
-// want a future block covering a pattern not ingested yet.
-const FUTURE_PATTERN_CYCLE = ["Graphs", "Dynamic Programming"];
+// Ordered list of patterns for blocks after the first (block 0's four are
+// fixed and don't come from this list). Trees & Recursion leads this list
+// rather than sitting in block 0 — Arrays & Strings took its place there
+// (see patternsForBlock) so it isn't lost, just deferred. Extend this (and
+// re-run scripts/ingest-problems.js with a matching PATTERN_RULES entry)
+// when you want a future block covering a pattern not ingested yet.
+const FUTURE_PATTERN_CYCLE = ["Trees & Recursion", "Graphs", "Dynamic Programming"];
 
 /**
  * The four topic patterns for a block's slots A/B/C/D (days 1-3, 4-6,
- * 8-10, 11-13). Block 0 is fixed; later blocks cycle through
- * FUTURE_PATTERN_CYCLE, 4 slots at a time, wrapping around — so with only
- * two future patterns ingested, block 1 is [Graphs, DP, Graphs, DP] (each
- * pattern gets two non-adjacent 3-day stretches, same total exposure block
- * 0's patterns got). Returns null if no future patterns are configured at
- * all, so callers can surface "nothing left to generate" instead of
- * fabricating content.
+ * 8-10, 11-13). Block 0 leads with Arrays & Strings (previously skipped
+ * straight to Two Pointers) so day 1 is genuinely that pattern, not a
+ * pre-marked-done placeholder. Later blocks cycle through
+ * FUTURE_PATTERN_CYCLE, 4 slots at a time, wrapping around — with three
+ * patterns cycling into four slots, one (whichever lands on both slot A
+ * and D) gets two non-adjacent 3-day stretches in that block; the ingested
+ * pool (24 per pattern) comfortably covers that. Returns null if no future
+ * patterns are configured at all, so callers can surface "nothing left to
+ * generate" instead of fabricating content.
  */
 function patternsForBlock(blockIndex) {
   if (blockIndex === 0) {
-    return ["Two Pointers", "Sliding Window", "Binary Search", "Trees & Recursion"];
+    return ["Arrays & Strings", "Two Pointers", "Sliding Window", "Binary Search"];
   }
   if (FUTURE_PATTERN_CYCLE.length === 0) return null;
   const offset = (blockIndex - 1) * 4;

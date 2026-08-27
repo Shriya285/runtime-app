@@ -31,7 +31,10 @@ export function useMoodState() {
   useEffect(() => {
     const now = new Date();
     const lastVisitRaw = localStorage.getItem(LAST_VISIT_KEY);
-    const storedStreak = parseInt(localStorage.getItem(STREAK_KEY) || "47", 10);
+    // "1" (a real day-one streak), not a placeholder that implied history
+    // that never happened — this only applies to brand-new/reset browsers;
+    // it doesn't touch a streak that's already stored.
+    const storedStreak = parseInt(localStorage.getItem(STREAK_KEY) || "1", 10);
 
     let mood = "idle";
     let gapHours = 0;

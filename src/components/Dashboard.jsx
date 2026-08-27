@@ -17,6 +17,7 @@ import { recordActivityToday, getWeekProgress } from "../lib/weeklyActivity";
 import { loadProblems } from "../lib/problemsData";
 import { problemToLessonShape } from "../lib/problemAdapter";
 import { getCurrentDayPlan, isBlockComplete, advanceDay, startNextBlock } from "../lib/studyPlan";
+import { resetStudyPlanAndStreak } from "../lib/resetProgress";
 
 const COLORS = {
   bg: "#1A1B26",
@@ -217,6 +218,14 @@ export default function Dashboard({ onSolutionRevealedEarly, streak = 0 }) {
     startNextBlock();
     setActivePlanProblem(null);
     setPlanRefreshKey((k) => k + 1);
+  };
+
+  const handleResetProgress = () => {
+    if (!window.confirm("Reset your streak to 1 and restart the 15-day plan from Day 1?")) return;
+    resetStudyPlanAndStreak();
+    setActivePlanProblem(null);
+    setPlanRefreshKey((k) => k + 1);
+    window.location.reload(); // re-run useMoodState's mount effect so the streak in the nav updates too
   };
 
   const handleMockOAFinish = (collected) => {
@@ -786,6 +795,22 @@ export default function Dashboard({ onSolutionRevealedEarly, streak = 0 }) {
                 <>Follow the 15-day plan above for what&rsquo;s next.</>
               )}
             </div>
+            <button
+              onClick={handleResetProgress}
+              style={{
+                marginTop: "12px",
+                background: "transparent",
+                border: "none",
+                color: COLORS.fgDim,
+                fontFamily: FONTS.mono,
+                fontSize: "10.5px",
+                textDecoration: "underline",
+                cursor: "pointer",
+                padding: 0,
+              }}
+            >
+              ↺ Reset streak &amp; restart plan from day 1
+            </button>
           </div>
         </div>
       </div>
