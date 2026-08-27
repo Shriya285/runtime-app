@@ -40,10 +40,14 @@ const DATASET_VERSION = "v0.3.1";
 const BASE_URL = `https://raw.githubusercontent.com/newfacade/LeetCodeDataset/main/data`;
 const FILES = [`LeetCodeDataset-${DATASET_VERSION}-train.jsonl.gz`, `LeetCodeDataset-${DATASET_VERSION}-test.jsonl.gz`];
 
-// How many problems to keep per pattern bucket. Chosen to comfortably cover
-// the 15-day plan (6 lesson slots + mock-OA + review draw per pattern) with
-// room to spare, without bundling the entire ~2900-problem corpus.
-const PROBLEMS_PER_PATTERN = 12;
+// How many problems to keep per pattern bucket. 24 rather than a tighter
+// number because generateNextBlock() can land the same pattern in two of a
+// block's four topic-slots when fewer than 4 unused patterns remain (e.g.
+// block 2 has only Graphs + Dynamic Programming available) — that's 12
+// lesson problems (2/day x 6 days) from ONE pattern before mock-OA/review
+// draws even start, so 12 wasn't enough headroom. All 7 buckets comfortably
+// support 24 in the raw dataset (the smallest, Sliding Window, has 142).
+const PROBLEMS_PER_PATTERN = 24;
 
 // Checked (in order) against each problem's tags; first match wins, so a
 // problem tagged both "Two Pointers" and "Array" lands in Two Pointers, not
