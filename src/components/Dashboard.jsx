@@ -17,7 +17,7 @@ import { recordActivityToday, getWeekProgress } from "../lib/weeklyActivity";
 import { loadProblems } from "../lib/problemsData";
 import { problemToLessonShape } from "../lib/problemAdapter";
 import { getCurrentDayPlan, isBlockComplete, advanceDay, startNextBlock } from "../lib/studyPlan";
-import { resetStudyPlanAndStreak } from "../lib/resetProgress";
+import { resetAllProgress } from "../lib/resetProgress";
 
 const COLORS = {
   bg: "#1A1B26",
@@ -221,11 +221,14 @@ export default function Dashboard({ onSolutionRevealedEarly, streak = 0 }) {
   };
 
   const handleResetProgress = () => {
-    if (!window.confirm("Reset your streak to 1 and restart the 15-day plan from Day 1?")) return;
-    resetStudyPlanAndStreak();
-    setActivePlanProblem(null);
-    setPlanRefreshKey((k) => k + 1);
-    window.location.reload(); // re-run useMoodState's mount effect so the streak in the nav updates too
+    if (
+      !window.confirm(
+        "Reset everything — streak, the 15-day plan, skill-path progress, and all saved notes/code? This can't be undone."
+      )
+    )
+      return;
+    resetAllProgress();
+    window.location.reload(); // re-run every hook's mount effect against the now-empty storage
   };
 
   const handleMockOAFinish = (collected) => {
@@ -809,7 +812,7 @@ export default function Dashboard({ onSolutionRevealedEarly, streak = 0 }) {
                 padding: 0,
               }}
             >
-              ↺ Reset streak &amp; restart plan from day 1
+              ↺ Reset everything &amp; start fresh
             </button>
           </div>
         </div>
