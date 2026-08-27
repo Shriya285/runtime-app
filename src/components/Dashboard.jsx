@@ -441,6 +441,22 @@ export default function Dashboard({ onSolutionRevealedEarly, streak = 0 }) {
             </h1>
           </div>
 
+          {lesson.prompt && (
+            <div
+              style={{
+                fontFamily: FONTS.body,
+                fontSize: "14px",
+                color: COLORS.fgDim,
+                lineHeight: 1.6,
+                marginBottom: "18px",
+                paddingBottom: "18px",
+                borderBottom: `1px solid ${COLORS.border}`,
+              }}
+            >
+              {lesson.prompt}
+            </div>
+          )}
+
           <div style={{ marginBottom: "14px" }}>
             <StruggleTimer lessonId={lesson.id} onReveal={handleReveal} revealed={solutionRevealed} />
           </div>
