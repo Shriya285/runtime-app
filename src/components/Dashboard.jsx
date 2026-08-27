@@ -78,9 +78,16 @@ export default function Dashboard({ onSolutionRevealedEarly, streak = 0 }) {
   const [showReport, setShowReport] = useState(false);
 
   // --- Study plan state ---
+  // The plan is the default/primary view — 'freeplay' only kicks in once
+  // you deliberately click one of the two hand-built lessons in the skill
+  // path. Without this distinction, "no plan problem open yet" (still
+  // loading) was indistinguishable from "deliberately viewing a hand-built
+  // lesson", so the terminal defaulted to Two Pointers instead of Day 1's
+  // actual assigned work.
+  const [viewMode, setViewMode] = useState("plan"); // 'plan' | 'freeplay'
   const [studyProblems, setStudyProblems] = useState(null);
   const [planRefreshKey, setPlanRefreshKey] = useState(0);
-  const [activePlanProblem, setActivePlanProblem] = useState(null); // dataset problem object, or null (freeplay)
+  const [activePlanProblem, setActivePlanProblem] = useState(null); // dataset problem object, or null
   const [mockOAActive, setMockOAActive] = useState(false);
 
   useEffect(() => {
@@ -97,9 +104,10 @@ export default function Dashboard({ onSolutionRevealedEarly, streak = 0 }) {
     () => localStorage.getItem(ACTIVE_LESSON_KEY) || LESSONS[0].id
   );
 
-  const lesson = activePlanProblem
-    ? problemToLessonShape(activePlanProblem)
-    : LESSONS.find((l) => l.id === activeLessonId) || LESSONS[0];
+  const lesson =
+    viewMode === "plan" && activePlanProblem
+      ? problemToLessonShape(activePlanProblem)
+      : LESSONS.find((l) => l.id === activeLessonId) || LESSONS[0];
   const availableLanguages = Object.keys(lesson.languages);
   const typedTitle = useTypedText(lesson.title, 55, 300);
 
@@ -145,9 +153,31 @@ export default function Dashboard({ onSolutionRevealedEarly, streak = 0 }) {
     execution.reset();
   };
 
+  // Auto-open today's first assigned problem once the plan loads, so the
+  // terminal actually shows Day 1's real content by default instead of
+  // sitting on whichever hand-built lesson happened to be last active.
+  // Must go through resetTransientState like the manual handlers do —
+  // without it, `lesson` (title/prompt/filename) updates but `code`/
+  // `language` stay at whatever the first render initialized them to.
+  useEffect(() => {
+    if (
+      viewMode === "plan" &&
+      !activePlanProblem &&
+      planDay &&
+      planDay.template.type === "lesson" &&
+      planDay.assignedProblems.length > 0
+    ) {
+      const problem = planDay.assignedProblems[0];
+      setActivePlanProblem(problem);
+      const shaped = problemToLessonShape(problem);
+      resetTransientState(shaped.id, shaped.defaultLanguage, shaped.languages);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode, activePlanProblem, planDay]);
+
   const handleSelectLesson = (lessonId) => {
-    const alreadyThere = !activePlanProblem && lessonId === activeLessonId;
-    setActivePlanProblem(null);
+    const alreadyThere = viewMode === "freeplay" && lessonId === activeLessonId;
+    setViewMode("freeplay");
     if (alreadyThere) return;
     localStorage.setItem(ACTIVE_LESSON_KEY, lessonId);
     setActiveLessonId(lessonId);
@@ -155,8 +185,26 @@ export default function Dashboard({ onSolutionRevealedEarly, streak = 0 }) {
     resetTransientState(lessonId, nextLesson.defaultLanguage, nextLesson.languages);
   };
 
+  // "Arrays & Strings" in the skill path has no hand-built lesson behind
+  // it — its real content lives in the plan (it's Day 1's actual pattern
+  // right now) — so selecting it just returns to the plan view rather than
+  // switching to a lesson id, which is what made it look inert before.
+  // Still has to reload code/language for whichever plan problem was
+  // already open — flipping viewMode alone left the freeplay lesson's code
+  // sitting in the editor under the plan problem's title/description.
+  const handleSelectPlanPattern = () => {
+    if (viewMode === "plan") return;
+    setViewMode("plan");
+    if (activePlanProblem) {
+      const shaped = problemToLessonShape(activePlanProblem);
+      resetTransientState(shaped.id, shaped.defaultLanguage, shaped.languages);
+    }
+  };
+
   const handleOpenPlanProblem = (problem) => {
-    if (activePlanProblem && activePlanProblem.id === problem.id) return;
+    const alreadyThere = viewMode === "plan" && activePlanProblem && activePlanProblem.id === problem.id;
+    setViewMode("plan");
+    if (alreadyThere) return;
     setActivePlanProblem(problem);
     const shaped = problemToLessonShape(problem);
     resetTransientState(shaped.id, shaped.defaultLanguage, shaped.languages);
@@ -267,8 +315,12 @@ export default function Dashboard({ onSolutionRevealedEarly, streak = 0 }) {
   // actually covers those patterns now via ingested problems).
   const twoPointersDone = !!getReviewRecord(CURRENT_LESSON.id);
   const slidingWindowDone = !!getReviewRecord(LESSON_SLIDING_WINDOW.id);
+  // Arrays & Strings has no hand-built lesson of its own — it's Block 0's
+  // days 1-3 in the plan, so "done" here means the plan has moved past
+  // day 3, not a permanently pre-marked placeholder.
+  const arraysStringsDone = Boolean(planDay) && (planDay.blockIndex > 0 || planDay.dayIndex >= 3);
   const skillPath = [
-    { name: "Arrays & Strings", lessonId: null, state: "done" },
+    { name: "Arrays & Strings", lessonId: null, isPlanLink: true, state: arraysStringsDone ? "done" : "active" },
     { name: "Two Pointers", lessonId: CURRENT_LESSON.id, state: twoPointersDone ? "done" : "active" },
     {
       name: "Sliding Window",
@@ -467,14 +519,15 @@ export default function Dashboard({ onSolutionRevealedEarly, streak = 0 }) {
               const isDone = node.state === "done";
               const isActive = node.state === "active";
               const isLocked = node.state === "locked";
-              const isCurrent = node.lessonId === lesson.id;
-              const clickable = Boolean(node.lessonId) && !isLocked;
+              const isCurrent = node.isPlanLink ? viewMode === "plan" : node.lessonId === lesson.id;
+              const clickable = (Boolean(node.lessonId) || node.isPlanLink) && !isLocked;
               const dotColor = isDone ? COLORS.green : isActive ? COLORS.blue : COLORS.comment;
+              const handleClick = node.isPlanLink ? handleSelectPlanPattern : () => handleSelectLesson(node.lessonId);
               return (
                 <div
                   key={node.name}
                   className="node-row"
-                  onClick={clickable ? () => handleSelectLesson(node.lessonId) : undefined}
+                  onClick={clickable ? handleClick : undefined}
                   style={{
                     position: "relative",
                     display: "flex",
