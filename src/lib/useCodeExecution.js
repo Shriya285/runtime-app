@@ -32,6 +32,15 @@ function buildDriverSource({ language, entryPoint, testCases, testKind = "args",
       "",
       "import json",
       `candidate = Solution().${entryPoint}`,
+      // Some ingested problems explicitly allow "any order" (3Sum, 4Sum,
+      // permutations, group-anagrams, N-Queens, etc.) — their assertions
+      // get rewritten at ingestion time to call this on both sides of ==
+      // instead of comparing raw order-sensitive lists. No-op for any
+      // assertion that doesn't call it.
+      "def __sorted_deep(x):",
+      "    if isinstance(x, list):",
+      "        return sorted((__sorted_deep(i) for i in x), key=str)",
+      "    return x",
       `__ASSERTIONS__ = json.loads(r'''${testsJson}''')`,
       "__results__ = []",
       "for __expr in __ASSERTIONS__:",

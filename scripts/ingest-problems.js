@@ -105,6 +105,93 @@ function extractAssertions(testCode) {
     .filter((expr) => !/==\s*None$/.test(expr));
 }
 
+// Problems whose real spec explicitly allows returning results in any
+// order (3Sum, 4Sum, permutations, group-anagrams, N-Queens, palindrome
+// partitioning, combination-sum-ii, accounts-merge) but whose ingested
+// assertions do strict, order-sensitive list equality against one
+// specific reference ordering. Verified empirically, not assumed: ran a
+// deliberately-different-but-correct alternate implementation of each
+// against its real assertions and confirmed high failure rates (e.g.
+// 4Sum 34/90, group-anagrams 19/69, n-queens 4/8, 3sum 24/104,
+// palindrome-partitioning 4/128) before adding it here. "permutations"
+// was tested too and empirically already fine (itertools.permutations
+// happens to match the reference order) but is included anyway for
+// consistency with its own "any order" spec — the rewrite is a no-op
+// when both sides already match.
+//
+// Fix: rewrite `EXPR == EXPECTED` to `__sorted_deep(EXPR) == __sorted_deep(EXPECTED)`
+// — see the matching __sorted_deep helper embedded in
+// src/lib/useCodeExecution.js's Python "assertions" driver. Recursively
+// sorts nested lists by string representation so order at any depth stops
+// mattering for comparison. One accepted tradeoff: this can't distinguish
+// "this list's internal order is genuinely required" from "any order is
+// fine" below the top level (e.g. accounts-merge's [name, ...emails]
+// shape) — acceptable here since this is practice-app grading, not an
+// adversarial judge, and the empirical re-check after applying this
+// showed no regressions.
+const ORDER_INSENSITIVE_PROBLEMS = new Set([
+  "3sum",
+  "4sum",
+  "permutations",
+  "permutations-ii",
+  "group-anagrams",
+  "n-queens",
+  "palindrome-partitioning",
+  "combination-sum",
+  "combination-sum-ii",
+  "accounts-merge",
+]);
+
+function toOrderInsensitive(expr) {
+  const idx = expr.lastIndexOf(") == ");
+  if (idx === -1) return expr; // doesn't match the expected shape — leave as-is rather than guess
+  const callPart = expr.slice(0, idx + 1);
+  const expectedPart = expr.slice(idx + 5);
+  return `__sorted_deep(${callPart}) == __sorted_deep(${expectedPart})`;
+}
+
+// combination-sum's own test inputs include candidates with duplicate
+// values twice (e.g. [2,5,2,1,2]) — the real "Combination Sum" problem
+// requires distinct candidates, and the reference solution (which
+// dedupes nothing, just sorts) produces literal duplicate combinations
+// on those inputs, e.g. [1,1,1,2] appearing 3 times for one call. That's
+// not a real target output, it's the reference leaking its own
+// implementation quirk on an out-of-spec input — same root cause as the
+// None-return issue, different shape. Drop assertions built on a
+// duplicate-valued candidates list rather than try to "fix" an answer
+// that was never well-defined to begin with.
+function hasDuplicateCandidates(expr) {
+  const match = /candidates\s*=\s*(\[[^\]]*\])/.exec(expr);
+  if (!match) return false;
+  try {
+    const values = JSON.parse(match[1]);
+    return new Set(values).size !== values.length;
+  } catch {
+    return false;
+  }
+}
+
+// The dataset's prelude sometimes imports third-party packages the Judge0
+// sandbox doesn't have installed (confirmed: `sortedcontainers` — 6
+// problems' preludes import it unconditionally, none of their actual
+// solutions use it, and it crashes every one of them with
+// ModuleNotFoundError before the solution code even runs, regardless of
+// what's submitted). Two-part fix: strip the dead import from every
+// prelude, and as a safety net for future re-ingestion, exclude any record
+// whose solution genuinely references a symbol from an unavailable
+// package instead of shipping a prelude that would crash on import.
+const UNAVAILABLE_PACKAGES = [{ pattern: /^from sortedcontainers import .*\n?/m, symbols: ["SortedList", "SortedDict", "SortedSet"] }];
+
+function sanitizePrelude(prelude) {
+  let result = prelude;
+  for (const { pattern } of UNAVAILABLE_PACKAGES) result = result.replace(pattern, "");
+  return result;
+}
+
+function usesUnavailablePackage(solutionCode) {
+  return UNAVAILABLE_PACKAGES.some(({ symbols }) => symbols.some((s) => solutionCode.includes(s)));
+}
+
 function finalizeStarterCode(starterCode) {
   const trimmed = starterCode.replace(/\s+$/, "");
   return `${trimmed}\n        pass\n`;
@@ -152,8 +239,18 @@ async function main() {
       skippedNoPattern++;
       continue;
     }
-    const testAssertions = extractAssertions(rec.test);
+    let testAssertions = extractAssertions(rec.test);
+    if (rec.task_id === "combination-sum") {
+      testAssertions = testAssertions.filter((expr) => !hasDuplicateCandidates(expr));
+    }
+    if (ORDER_INSENSITIVE_PROBLEMS.has(rec.task_id)) {
+      testAssertions = testAssertions.map(toOrderInsensitive);
+    }
     if (testAssertions.length === 0) {
+      skippedIncomplete++;
+      continue;
+    }
+    if (usesUnavailablePackage(rec.completion)) {
       skippedIncomplete++;
       continue;
     }
@@ -166,7 +263,7 @@ async function main() {
       difficulty: rec.difficulty,
       description: cleanDescription(rec.problem_description),
       entryPoint: match[1],
-      pythonPrelude: rec.prompt,
+      pythonPrelude: sanitizePrelude(rec.prompt),
       starterCode: finalizeStarterCode(rec.starter_code),
       solutionCode: rec.completion,
       testCases: testAssertions,
