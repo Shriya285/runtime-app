@@ -239,6 +239,17 @@ export default function Dashboard({ onSolutionRevealedEarly, streak = 0 }) {
     setPromptDismissed(false);
   };
 
+  // Advisory soft-check (OutputPanel) rather than an automatic pass — a
+  // near-miss run looks identical whether it's a subtle real bug or a
+  // test-data issue, so this hands the call to the user instead of
+  // silently deciding. Goes through the same completion flow as a full
+  // pass, just tagged separately so the weekly report and review history
+  // show it was a self-vouched call, not an automated 100%.
+  const handleOverridePass = () => {
+    setCompletion({ reason: "tests-passed-override" });
+    setPromptDismissed(false);
+  };
+
   const handleSaveCompletion = ({ trigger, coreIdea }) => {
     recordCompletion(lesson.id, { trigger, coreIdea, reason: completion.reason, code, language, mode: "lesson" });
     logCompletion({
@@ -770,6 +781,7 @@ export default function Dashboard({ onSolutionRevealedEarly, streak = 0 }) {
                     results={execution.results}
                     runtimeMs={execution.runtimeMs}
                     memoryBytes={execution.memoryBytes}
+                    onOverridePass={handleOverridePass}
                     testCount={lesson.testCases.length}
                   />
                 </div>

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { describeReason } from "../lib/completionReason";
 
 const COLORS = {
   surface: "#20222F",
@@ -8,6 +9,7 @@ const COLORS = {
   fgDim: "#787C99",
   green: "#9ECE6A",
   blue: "#7AA2F7",
+  cyan: "#7DCFFF",
 };
 const FONTS = { mono: "'JetBrains Mono', monospace" };
 
@@ -29,6 +31,7 @@ export default function CompletionPrompt({ reason, onSave, onDismiss }) {
   const [trigger, setTrigger] = useState("");
   const [coreIdea, setCoreIdea] = useState("");
   const canSave = trigger.trim() && coreIdea.trim();
+  const { promptLabel, color: colorKey } = describeReason(reason);
 
   const handleSave = () => {
     if (!canSave) return;
@@ -48,13 +51,13 @@ export default function CompletionPrompt({ reason, onSave, onDismiss }) {
     >
       <div
         style={{
-          color: reason === "tests-passed" ? COLORS.green : COLORS.blue,
+          color: COLORS[colorKey],
           fontSize: "12px",
           marginBottom: "10px",
           fontWeight: 600,
         }}
       >
-        {reason === "tests-passed" ? "Tests passed — lock it in" : "Solution revealed — lock it in anyway"}
+        {promptLabel}
       </div>
       <label style={{ display: "block", fontSize: "11px", color: COLORS.fgDim, marginBottom: "4px" }}>
         Trigger — how will you recognize this pattern next time?

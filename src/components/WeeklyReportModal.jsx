@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { describeReason } from "../lib/completionReason";
 
 const COLORS = {
   bg: "#1A1B26",
@@ -15,7 +16,7 @@ const FONTS = { mono: "'JetBrains Mono', monospace", body: "'Plus Jakarta Sans',
 function buildReportText(completions, feedback) {
   const lines = ["runtime. — weekly report", ""];
   completions.forEach((c, i) => {
-    const how = c.reason === "tests-passed" ? "solved" : "solution revealed";
+    const how = describeReason(c.reason).label;
     lines.push(`${i + 1}. ${c.lessonTitle} (${c.language}) — ${how}`);
     lines.push(`   Trigger: ${c.trigger}`);
     lines.push(`   Core idea: ${c.coreIdea}`);
@@ -129,8 +130,7 @@ export default function WeeklyReportModal({ completions, onClose }) {
             {completions.map((c, i) => (
               <div key={i} style={{ marginBottom: "16px", paddingBottom: "16px", borderBottom: `1px solid ${COLORS.border}` }}>
                 <div style={{ fontFamily: FONTS.mono, fontSize: "12px", color: COLORS.blue, marginBottom: "6px" }}>
-                  {c.lessonTitle} &middot; {c.language} &middot;{" "}
-                  {c.reason === "tests-passed" ? "solved" : "solution revealed"}
+                  {c.lessonTitle} &middot; {c.language} &middot; {describeReason(c.reason).label}
                 </div>
                 <div style={{ fontSize: "12.5px", color: COLORS.fgDim, marginBottom: "4px" }}>
                   <strong style={{ color: COLORS.fg }}>Trigger:</strong> {c.trigger}
