@@ -1,1 +1,8 @@
-{}
+{
+  "functions": {
+    "api/send-digest.js": { "maxDuration": 10 }
+  },
+  "crons": [
+    { "path": "/api/send-digest", "schedule": "0 14 * * *" }
+  ]
+}

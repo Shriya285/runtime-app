@@ -5,7 +5,7 @@ const COLORS = { bg: "#1C1E2A", border: "#2E3244", fg: "#C0CAF5", fgDim: "#787C9
 const FONTS = { mono: "'JetBrains Mono', monospace" };
 
 /**
- * Client-side capture for the email digest channel (server/send-digest.js).
+ * Client-side capture for the email digest channel (api/send-digest.js).
  * Stores locally for now — wiring this to a real POST /api/subscribe-email
  * needs the backend described in server/subscribe-email.js.
  */
@@ -36,7 +36,7 @@ export default function EmailDigestOptIn() {
       }}
     >
       Email digest for the 24h+ gaps push can't reliably cover — not wired to a real send yet, see
-      server/send-digest.js.
+      api/send-digest.js.
       <div style={{ display: "flex", gap: "6px", marginTop: "8px" }}>
         <input
           type="email"

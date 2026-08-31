@@ -28,6 +28,10 @@ export const SAVAGE_LINES = [
   "I'm not mad. I'm just disappointed. Extremely, extremely disappointed.",
   "Took you long enough. The problems missed you more than I did. Barely.",
   "Congrats on the achievement: 'Ghosted your own curriculum.'",
+  // a week+ absent (tier-2 streak-reminder email) — the far end of this
+  // same bank, just longer gone.
+  "A whole week. Your streak isn't just dead, it's decomposing at this point.",
+  "Seven days of silence. I checked if you still existed. Jury's out.",
 ];
 
 export const RETURN_ON_TIME_LINES = [
@@ -60,6 +64,10 @@ export const ANNOYED_LINES = [
   "Some of that passed. Some. Not thrilled, not furious.",
   "Halfway there. I've seen worse. I've also seen better.",
   "You're testing my patience and your test cases, in that order.",
+  // 2-3 days absent (tier-1 streak-reminder email) — same "mildly annoyed,
+  // not furious yet" register, applied to absence instead of a test run.
+  "Two hearts left. Your streak's on life support and I'm not thrilled about it.",
+  "Still 2-3 days out. Not a crisis yet. Getting there.",
 ];
 
 export const ANGRY_LINES = [

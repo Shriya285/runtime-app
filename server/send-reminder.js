@@ -6,7 +6,7 @@
 // Push only covers the 6-24h nudge tier now — a push notification only
 // reaches you if the OS delivers it and you happen to be looking, which
 // gets less reliable the longer you've been gone. 24h+ and 48h+ absence
-// are handled by the email digest instead (see send-digest.js), which
+// are handled by the email digest instead (see api/send-digest.js), which
 // survives days of not having the app open.
 //
 // To make this real, you'd need:
@@ -16,9 +16,10 @@
 //   3. A place to store push subscriptions per user (MongoDB Atlas, same
 //      as the rest of your stack) — created when the user grants
 //      notification permission and calls pushManager.subscribe()
-//   4. Move this file (and send-digest.js) into /api/, then wire up
-//      vercel.json's functions/crons config — see the detailed note in
-//      send-digest.js for exactly why and what that config looks like.
+//   4. Move this file into /api/ too (api/send-digest.js already made
+//      that move — see the detailed note at the top of that file for
+//      exactly why and what the vercel.json functions/crons config
+//      needs to look like once both are there).
 //
 // Below is the shape of what that function looks like once wired up.
 
