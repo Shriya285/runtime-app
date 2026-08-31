@@ -17,7 +17,9 @@ const FONT_DISPLAY = "'Press Start 2P', 'JetBrains Mono', 'Courier New', monospa
 const FONT_WORDMARK = "'Space Grotesk', 'Segoe UI', Arial, sans-serif";
 
 // 8x7 pixel-grid heart, hand-plotted as filled cells (classic blocky heart).
-const HEART_CELLS = [
+// Exported so the /revive route's in-app heart display can share these
+// exact coordinates with the email — same pixel-art shape in both places.
+export const HEART_CELLS = [
   [1, 0], [2, 0], [5, 0], [6, 0],
   [0, 1], [1, 1], [2, 1], [3, 1], [4, 1], [5, 1], [6, 1], [7, 1],
   [0, 2], [1, 2], [2, 2], [3, 2], [4, 2], [5, 2], [6, 2], [7, 2],
@@ -27,7 +29,7 @@ const HEART_CELLS = [
   [3, 6], [4, 6],
 ];
 // Perimeter-only subset, used for the "hollow/dashed" heart state.
-const HEART_OUTLINE_CELLS = [
+export const HEART_OUTLINE_CELLS = [
   [1, 0], [2, 0], [5, 0], [6, 0],
   [0, 1], [3, 1], [4, 1], [7, 1],
   [0, 2], [7, 2],
@@ -37,7 +39,8 @@ const HEART_OUTLINE_CELLS = [
   [3, 6], [4, 6],
 ];
 
-const CELL = 3.5; // px per pixel-grid unit
+export const HEART_CELL_SIZE = 3.5; // px per pixel-grid unit at 1x scale
+const CELL = HEART_CELL_SIZE;
 const HEART_W = 8 * CELL;
 const HEART_H = 7 * CELL;
 

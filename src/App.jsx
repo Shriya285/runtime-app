@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import Dashboard from "./components/Dashboard";
+import RevivePage from "./components/RevivePage";
 import SassyBotMount from "./components/SassyBotMount";
 import SassyToast from "./components/SassyToast";
 import EmailDigestOptIn from "./components/EmailDigestOptIn";
@@ -14,9 +15,19 @@ import {
 } from "./lib/notifications";
 import { PUSH_NOTIFICATIONS } from "./lib/sassyLines";
 
+// No routing library is installed — the app is otherwise a single-view
+// SPA, so this one extra route is handled by hand rather than pulling in
+// react-router-dom for a single path. Read once: the only ways in are a
+// direct/typed navigation or the FLATLINED email's CTA link, both full
+// page loads, so there's no in-app link that needs live route updates.
+function isRevivePath() {
+  return typeof window !== "undefined" && window.location.pathname.replace(/\/$/, "") === "/revive";
+}
+
 export default function App() {
   const moodState = useMoodState(); // { mood, gapHours, streak, justReturned } or null on first tick
   const execution = useCodeExecution();
+  const isRevive = isRevivePath();
   const { sentiment, reportRunResult, reportSolutionRevealedEarly, handleAutoSassy } = useSassyBotSentiment(
     moodState,
     { isExecuting: execution.isLoading }
@@ -62,6 +73,14 @@ export default function App() {
       scheduleLocalReminder(20000, "nudge");
     }
   };
+
+  if (isRevive) {
+    return (
+      <CodeExecutionContext.Provider value={execution}>
+        <RevivePage />
+      </CodeExecutionContext.Provider>
+    );
+  }
 
   return (
     <div style={{ position: "relative" }}>

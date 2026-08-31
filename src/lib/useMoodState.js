@@ -3,6 +3,17 @@ import { useEffect, useState } from "react";
 const LAST_VISIT_KEY = "runtime_last_visit";
 const STREAK_KEY = "runtime_streak";
 
+/**
+ * Called on the 3rd /revive solve: resumes streak tracking fresh from day 1
+ * rather than leaving it wherever it broke. A deliberate "restart," not the
+ * same as resetAllProgress() — this touches only the streak/last-visit
+ * pair, leaving the study plan, review history, and completion log intact.
+ */
+export function reviveStreak() {
+  localStorage.setItem(STREAK_KEY, "1");
+  localStorage.setItem(LAST_VISIT_KEY, new Date().toISOString());
+}
+
 function hoursBetween(a, b) {
   return Math.abs(b - a) / (1000 * 60 * 60);
 }
