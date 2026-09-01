@@ -34,7 +34,17 @@ import { pickLine } from "../src/lib/sassyLines.js";
 import { buildTier1Email, buildTier2Email } from "../src/lib/emailTemplates.js";
 
 const DOMAIN = "https://runtime-app-beta.vercel.app";
-const resend = new Resend(process.env.RESEND_API_KEY);
+
+// Resend's constructor throws synchronously on a missing/empty API key
+// (not a lazy check on first send) — `new Resend(undefined)` crashes the
+// whole function before it ever reaches the "nothing to send yet" early
+// return below. Since RESEND_API_KEY genuinely isn't set yet, construction
+// is deferred into the handler and guarded, so this cron endpoint returns
+// a real, informative response instead of a 500 until it's configured.
+function getResendClient() {
+  if (!process.env.RESEND_API_KEY) return null;
+  return new Resend(process.env.RESEND_API_KEY);
+}
 
 function tierForGapHours(hours) {
   if (hours >= 168) return "tier2"; // FLATLINED — a week+
@@ -91,6 +101,12 @@ export default async function handler(req, res) {
   // }).toArray();
 
   const usersToEmail = []; // placeholder — see comment above
+
+  const resend = getResendClient();
+  if (!resend) {
+    res.status(200).json({ sent: 0, note: "RESEND_API_KEY is not configured — no email was sent." });
+    return;
+  }
 
   const results = await Promise.allSettled(
     usersToEmail.map((user) => {
